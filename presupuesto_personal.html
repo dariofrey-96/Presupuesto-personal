@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Presupuesto">
+<meta name="theme-color" content="#0d1117">
+<title>Presupuesto Personal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0d1117;
+  --s1:       #161b22;
+  --s2:       #1c2333;
+  --s3:       #21262d;
+  --border:   #30363d;
+  --text:     #e6edf3;
+  --muted:    #7d8590;
+  --accent:   #58a6ff;
+  --green:    #3fb950;
+  --red:      #f85149;
+  --orange:   #d29922;
+  --purple:   #bc8cff;
+  --teal:     #39d353;
+  --yellow:   #e3b341;
+}
+
+html { font-size: 14px; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+header {
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left { display: flex; align-items: baseline; gap: 12px; }
+header h1 { font-size: 1.05rem; font-weight: 600; }
+header .sub { font-size: .75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+.tabs { display: flex; gap: 2px; }
+.tab {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: .75rem;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tab.active {
+  background: var(--s2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* ── LAYOUT ── */
+.shell {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: calc(100vh - 61px);
+}
+
+/* ── SIDEBAR ── */
+aside {
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.grp-label {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: .7rem; color: var(--muted); }
+.field-row { display: flex; align-items: center; gap: 8px; }
+.field input[type="range"] {
+  flex: 1; accent-color: var(--accent); height: 3px; cursor: pointer;
+}
+.val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .75rem;
+  font-weight: 600;
+  min-width: 80px;
+  text-align: right;
+  color: var(--text);
+}
+
+.toggle-field { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+.toggle-field label { font-size: .7rem; color: var(--muted); }
+.switch { position: relative; width: 36px; height: 20px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-sw {
+  position: absolute; inset: 0; background: var(--s3);
+  border: 1px solid var(--border); border-radius: 20px; cursor: pointer;
+  transition: .2s;
+}
+.slider-sw::before {
+  content: '';
+  position: absolute; width: 14px; height: 14px;
+  left: 2px; top: 2px;
+  background: var(--muted); border-radius: 50%; transition: .2s;
+}
+.switch input:checked + .slider-sw { background: rgba(88,166,255,.2); border-color: var(--accent); }
+.switch input:checked + .slider-sw::before { background: var(--accent); transform: translateX(16px); }
+
+/* ── MAIN ── */
+main { display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── KPI STRIP ── */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.kpi { padding: 16px 18px; border-right: 1px solid var(--border); }
+.kpi:last-child { border-right: none; }
+.kpi-label { font-size: .6rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
+.kpi-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.1rem; font-weight: 600; line-height: 1;
+}
+.kpi-sub { font-size: .65rem; color: var(--muted); margin-top: 3px; }
+
+.green  { color: var(--green);  }
+.red    { color: var(--red);    }
+.orange { color: var(--orange); }
+.blue   { color: var(--accent); }
+.purple { color: var(--purple); }
+
+/* ── CONTENT AREA ── */
+.content { flex: 1; overflow-y: auto; }
+
+/* ── VIEW: PRESUPUESTO ── */
+.pres-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.pres-col { border-right: 1px solid var(--border); }
+.pres-col:last-child { border-right: none; }
+
+.section-hdr {
+  padding: 10px 18px;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--s1);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+.section-hdr span { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  border-bottom: 1px solid rgba(48,54,61,.4);
+  font-size: .78rem;
+  transition: background .1s;
+}
+.budget-row:hover { background: var(--s2); }
+.budget-row.total-row {
+  background: var(--s2);
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  font-size: .8rem;
+}
+.budget-row .name { color: var(--text); flex: 1; }
+.budget-row .pct {
+  font-size: .65rem; color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 40px; text-align: right; margin-right: 12px;
+}
+.budget-row .amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .78rem; min-width: 90px; text-align: right;
+}
+.tag-extra {
+  font-size: .55rem; padding: 1px 5px; border-radius: 3px;
+  background: rgba(188,140,255,.15); color: var(--purple);
+  margin-left: 6px; vertical-align: middle;
+}
+.tag-fam {
+  font-size: .55rem; padding: 1px 5px; border-radius: 3px;
+  background: rgba(57,211,83,.12); color: var(--teal);
+  margin-left: 6px; vertical-align: middle;
+}
+
+/* ── BAR DE DISTRIBUCIÓN ── */
+.dist-bar-wrap { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.dist-bar {
+  height: 8px; border-radius: 4px; display: flex; overflow: hidden; gap: 2px;
+}
+.dist-seg { border-radius: 2px; transition: width .3s; }
+.dist-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.dist-leg-item { display: flex; align-items: center; gap: 5px; font-size: .65rem; color: var(--muted); }
+.dist-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── VIEW: PROYECCIÓN ── */
+.proy-view { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.chart-hdr { display: flex; justify-content: space-between; align-items: center; }
+.chart-title { font-size: .82rem; font-weight: 600; }
+.chart-wrap-inner { position: relative; height: 280px; }
+
+/* ── TABLE PROY ── */
+.proy-table-wrap { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: .7rem; font-family: 'JetBrains Mono', monospace; }
+thead th {
+  position: sticky; top: 0; background: var(--s1);
+  color: var(--muted); font-size: .6rem; text-transform: uppercase;
+  letter-spacing: .06em; padding: 7px 12px; text-align: right;
+  border-bottom: 1px solid var(--border); font-family: 'Inter', sans-serif;
+}
+thead th:first-child { text-align: center; }
+thead th:nth-child(2) { text-align: left; }
+tbody tr { border-bottom: 1px solid rgba(48,54,61,.4); }
+tbody tr:hover { background: var(--s2); }
+tbody td { padding: 5px 12px; text-align: right; }
+tbody td:first-child { text-align: center; color: var(--muted); }
+tbody td:nth-child(2) { text-align: left; color: var(--text); }
+.surplus-pos { color: var(--green); }
+.surplus-neg { color: var(--red); }
+
+/* ── VIEW: GASTOS DEL MES ── */
+.gastos-view { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.gastos-hdr { display: flex; justify-content: space-between; align-items: baseline; }
+.gastos-hdr .chart-title { font-size: .82rem; font-weight: 600; }
+.gastos-hdr .gastos-mes { font-size: .68rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; text-transform: capitalize; }
+
+.gasto-form {
+  display: grid;
+  grid-template-columns: 130px 1fr 140px 1fr auto;
+  gap: 10px;
+  align-items: end;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.gasto-form .field label { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; display: block; }
+.gasto-form input, .gasto-form select {
+  width: 100%;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: .75rem;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+}
+.gasto-form input:focus, .gasto-form select:focus { border-color: var(--accent); }
+.btn-add-gasto {
+  background: var(--accent); color: #0d1117; border: none; border-radius: 6px;
+  padding: 8px 16px; font-size: .75rem; font-weight: 600; cursor: pointer; transition: opacity .15s;
+  white-space: nowrap;
+}
+.btn-add-gasto:hover { opacity: .85; }
+
+.gastos-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.gk { background: var(--s1); padding: 12px 16px; }
+.gk-label { font-size: .6rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.gk-val { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; }
+
+.pv-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.pv-hdr { padding: 10px 16px; font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: var(--s1); border-bottom: 1px solid var(--border); }
+.pv-row { padding: 10px 16px; border-bottom: 1px solid rgba(48,54,61,.4); }
+.pv-row:last-child { border-bottom: none; }
+.pv-row-top { display: flex; justify-content: space-between; align-items: baseline; font-size: .75rem; margin-bottom: 6px; }
+.pv-row-top .pv-name { color: var(--text); }
+.pv-row-top .pv-nums { font-family: 'JetBrains Mono', monospace; color: var(--muted); font-size: .72rem; }
+.pv-row-top .pv-nums b { color: var(--text); }
+.pv-bar { height: 6px; border-radius: 3px; background: var(--s3); overflow: hidden; }
+.pv-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.pv-pct { font-size: .65rem; font-family: 'JetBrains Mono', monospace; margin-left: 8px; }
+.pv-empty { padding: 20px; text-align: center; color: var(--muted); font-size: .75rem; }
+
+.retiro-card {
+  border: 1px solid var(--border); border-radius: 8px; padding: 16px;
+  background: var(--s1); display: flex; flex-direction: column; gap: 12px;
+}
+.retiro-card .rc-hdr { font-size: .78rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.retiro-card .rc-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+.retiro-card .field label { font-size: .62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; display: block; }
+.retiro-card input {
+  background: var(--s2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 7px 9px; font-size: .75rem; font-family: 'JetBrains Mono', monospace; width: 130px;
+}
+.retiro-card .rc-preview { font-size: .72rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+.retiro-card .rc-preview b { color: var(--text); }
+.retiro-card .rc-note { font-size: .65rem; color: var(--muted); line-height: 1.5; }
+
+.header-right { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  background: var(--s2); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 6px; padding: 6px 10px; font-size: .68rem; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.icon-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.gastos-table-wrap { border: 1px solid var(--border); border-radius: 6px; max-height: 380px; overflow-y: auto; }
+.gastos-table-wrap table { font-size: .74rem; }
+.gastos-table-wrap td, .gastos-table-wrap th { text-align: left; }
+.gastos-table-wrap th:last-child, .gastos-table-wrap td:last-child { text-align: right; }
+.gastos-table-wrap th:nth-child(3), .gastos-table-wrap td:nth-child(3) { text-align: right; }
+.del-gasto-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: .78rem; padding: 2px 6px; border-radius: 4px; transition: all .1s;
+}
+.del-gasto-btn:hover { color: var(--red); background: rgba(248,81,73,.1); }
+.gastos-empty { padding: 24px; text-align: center; color: var(--muted); font-size: .75rem; }
+.cat-chip { font-size: .62rem; padding: 2px 7px; border-radius: 10px; background: var(--s3); color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Presupuesto Personal</h1>
+    <span class="sub">ARS · mensual</span>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('presupuesto')">Presupuesto</button>
+    <button class="tab" onclick="setTab('gastos')">Gastos del mes</button>
+    <button class="tab" onclick="setTab('historico')">Histórico</button>
+    <button class="tab" onclick="setTab('proyeccion')">Proyección</button>
+  </div>
+  <div class="header-right">
+    <button class="icon-btn" onclick="exportBackup()" title="Descargar todos los datos en un archivo JSON">⬇ Backup</button>
+    <button class="icon-btn" onclick="$('import-file-input').click()" title="Restaurar datos desde un backup JSON">⬆ Restaurar</button>
+    <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="importBackup(event)">
+  </div>
+</header>
+
+<div class="shell">
+  <aside>
+
+    <div>
+      <div class="grp-label">Ingresos</div>
+      <div class="field">
+        <label>Salario mensual (ARS)</label>
+        <div class="field-row">
+          <input type="range" id="salario" min="500000" max="20000000" value="3000000" step="100000">
+          <span class="val" id="v-salario"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="grp-label">Gastos Fijos</div>
+      <div class="field">
+        <label>Estudios y aprendizaje</label>
+        <div class="field-row">
+          <input type="range" id="estudios" min="0" max="1000000" value="300000" step="10000">
+          <span class="val" id="v-estudios"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="grp-label">Gastos Variables</div>
+      <div class="field">
+        <label>Juntadas / salidas / comidas</label>
+        <div class="field-row">
+          <input type="range" id="juntadas" min="0" max="2000000" value="300000" step="10000">
+          <span class="val" id="v-juntadas"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Gimnasio</label>
+        <div class="field-row">
+          <input type="range" id="gimnasio" min="0" max="300000" value="50000" step="5000">
+          <span class="val" id="v-gimnasio"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nafta / transporte</label>
+        <div class="field-row">
+          <input type="range" id="nafta" min="0" max="500000" value="100000" step="10000">
+          <span class="val" id="v-nafta"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Suscripciones</label>
+        <div class="field-row">
+          <input type="range" id="suscripciones" min="0" max="300000" value="70000" step="5000">
+          <span class="val" id="v-suscripciones"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Casa (alquiler / expensas)</label>
+        <div class="field-row">
+          <input type="range" id="casa" min="0" max="5000000" value="500000" step="50000">
+          <span class="val" id="v-casa"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>CNC (varios / imprevistos)</label>
+        <div class="field-row">
+          <input type="range" id="cnc" min="0" max="1000000" value="250000" step="10000">
+          <span class="val" id="v-cnc"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="grp-label">Fondos y Ahorros</div>
+      <div class="field">
+        <label>Fondo de Emergencia</label>
+        <div class="field-row">
+          <input type="range" id="fEmergencia" min="0" max="1000000" value="250000" step="10000">
+          <span class="val" id="v-fEmergencia"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Fondo de Vacaciones</label>
+        <div class="field-row">
+          <input type="range" id="fVacaciones" min="0" max="500000" value="160000" step="10000">
+          <span class="val" id="v-fVacaciones"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Fondo de Inversiones</label>
+        <div class="field-row">
+          <input type="range" id="fInversiones" min="0" max="5000000" value="1000000" step="50000">
+          <span class="val" id="v-fInversiones"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="grp-label">Gastos Extra (opcionales)</div>
+      <div class="toggle-field">
+        <label>Prepaga / salud</label>
+        <label class="switch"><input type="checkbox" id="tog-prepaga"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-prepaga" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="prepaga" min="0" max="1000000" value="150000" step="10000">
+          <span class="val" id="v-prepaga"></span>
+        </div>
+      </div>
+
+      <div class="toggle-field" style="margin-top:10px">
+        <label>Auto (cuota / seguro)</label>
+        <label class="switch"><input type="checkbox" id="tog-auto"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-auto" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="auto" min="0" max="2000000" value="300000" step="50000">
+          <span class="val" id="v-auto"></span>
+        </div>
+      </div>
+
+      <div class="toggle-field" style="margin-top:10px">
+        <label>Viajes</label>
+        <label class="switch"><input type="checkbox" id="tog-viajes"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-viajes" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="viajes" min="0" max="1000000" value="200000" step="10000">
+          <span class="val" id="v-viajes"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="grp-label">Gastos Familiares (futuro)</div>
+      <div class="toggle-field">
+        <label>Colegio / educación hijos</label>
+        <label class="switch"><input type="checkbox" id="tog-colegio"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-colegio" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="colegio" min="0" max="2000000" value="400000" step="50000">
+          <span class="val" id="v-colegio"></span>
+        </div>
+      </div>
+
+      <div class="toggle-field" style="margin-top:10px">
+        <label>Niñera / jardín</label>
+        <label class="switch"><input type="checkbox" id="tog-ninera"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-ninera" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="ninera" min="0" max="1500000" value="300000" step="50000">
+          <span class="val" id="v-ninera"></span>
+        </div>
+      </div>
+
+      <div class="toggle-field" style="margin-top:10px">
+        <label>Actividades / deportes hijos</label>
+        <label class="switch"><input type="checkbox" id="tog-actividades"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-actividades" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="actividades" min="0" max="500000" value="150000" step="10000">
+          <span class="val" id="v-actividades"></span>
+        </div>
+      </div>
+
+      <div class="toggle-field" style="margin-top:10px">
+        <label>Casa más grande / barrio</label>
+        <label class="switch"><input type="checkbox" id="tog-casaFam"><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-casaFam" style="display:none;margin-top:6px">
+        <div class="field-row">
+          <input type="range" id="casaFam" min="0" max="5000000" value="800000" step="50000">
+          <span class="val" id="v-casaFam"></span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="grp-label">Proyección</div>
+      <div class="field">
+        <label>Crecimiento salarial anual</label>
+        <div class="field-row">
+          <input type="range" id="crecSalario" min="0" max="0.5" value="0.1" step="0.01">
+          <span class="val" id="v-crecSalario"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Inflación anual estimada</label>
+        <div class="field-row">
+          <input type="range" id="inflacionARS" min="0" max="1.5" value="0.5" step="0.05">
+          <span class="val" id="v-inflacionARS"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Años a proyectar</label>
+        <div class="field-row">
+          <input type="range" id="anosProy" min="1" max="30" value="10" step="1">
+          <span class="val" id="v-anosProy"></span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <main>
+    <div class="kpi-strip">
+      <div class="kpi">
+        <div class="kpi-label">Ingresos</div>
+        <div class="kpi-val blue" id="kpi-ing"></div>
+        <div class="kpi-sub">mensual</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Gastos totales</div>
+        <div class="kpi-val" id="kpi-gas"></div>
+        <div class="kpi-sub" id="kpi-gas-pct"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Inversión / Ahorro</div>
+        <div class="kpi-val green" id="kpi-inv"></div>
+        <div class="kpi-sub" id="kpi-inv-pct"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Superávit / Déficit</div>
+        <div class="kpi-val" id="kpi-sup"></div>
+        <div class="kpi-sub" id="kpi-sup-sub"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Salario real (hoy)</div>
+        <div class="kpi-val purple" id="kpi-real"></div>
+        <div class="kpi-sub" id="kpi-real-sub">en 10 años</div>
+      </div>
+    </div>
+
+    <!-- BARRA DISTRIBUCIÓN -->
+    <div class="dist-bar-wrap">
+      <div class="dist-bar" id="dist-bar"></div>
+      <div class="dist-legend" id="dist-legend"></div>
+    </div>
+
+    <div class="content">
+      <!-- VIEW: PRESUPUESTO -->
+      <div id="view-presupuesto">
+        <div class="pres-view">
+          <!-- COL IZQUIERDA: Ingresos + Gastos -->
+          <div class="pres-col">
+            <div class="section-hdr">Ingresos <span id="t-ingresos"></span></div>
+            <div class="budget-row">
+              <span class="name">Salario mensual</span>
+              <span class="pct" id="p-salario">100%</span>
+              <span class="amount blue" id="a-salario"></span>
+            </div>
+
+            <div class="section-hdr" style="margin-top:1px">Gastos Fijos <span id="t-fijos"></span></div>
+            <div class="budget-row">
+              <span class="name">Estudios y aprendizaje</span>
+              <span class="pct" id="p-estudios"></span>
+              <span class="amount" id="a-estudios"></span>
+            </div>
+
+            <div class="section-hdr" style="margin-top:1px">Gastos Variables <span id="t-variables"></span></div>
+            <div class="budget-row">
+              <span class="name">Juntadas / salidas / comidas</span>
+              <span class="pct" id="p-juntadas"></span>
+              <span class="amount" id="a-juntadas"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Gimnasio</span>
+              <span class="pct" id="p-gimnasio"></span>
+              <span class="amount" id="a-gimnasio"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Nafta / transporte</span>
+              <span class="pct" id="p-nafta"></span>
+              <span class="amount" id="a-nafta"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Suscripciones</span>
+              <span class="pct" id="p-suscripciones"></span>
+              <span class="amount" id="a-suscripciones"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Casa (alquiler / expensas)</span>
+              <span class="pct" id="p-casa"></span>
+              <span class="amount" id="a-casa"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">CNC / imprevistos</span>
+              <span class="pct" id="p-cnc"></span>
+              <span class="amount" id="a-cnc"></span>
+            </div>
+
+            <!-- EXTRAS -->
+            <div id="section-extras" style="display:none">
+              <div class="section-hdr" style="margin-top:1px">Gastos Extra <span id="t-extras"></span></div>
+              <div class="budget-row" id="row-vis-prepaga" style="display:none">
+                <span class="name">Prepaga / salud <span class="tag-extra">EXTRA</span></span>
+                <span class="pct" id="p-prepaga"></span>
+                <span class="amount" id="a-prepaga"></span>
+              </div>
+              <div class="budget-row" id="row-vis-auto" style="display:none">
+                <span class="name">Auto (cuota / seguro) <span class="tag-extra">EXTRA</span></span>
+                <span class="pct" id="p-auto"></span>
+                <span class="amount" id="a-auto"></span>
+              </div>
+              <div class="budget-row" id="row-vis-viajes" style="display:none">
+                <span class="name">Viajes <span class="tag-extra">EXTRA</span></span>
+                <span class="pct" id="p-viajes"></span>
+                <span class="amount" id="a-viajes"></span>
+              </div>
+            </div>
+
+            <!-- FAMILIA -->
+            <div id="section-familia" style="display:none">
+              <div class="section-hdr" style="margin-top:1px">Gastos Familiares <span id="t-familia"></span></div>
+              <div class="budget-row" id="row-vis-colegio" style="display:none">
+                <span class="name">Colegio / educación hijos <span class="tag-fam">FAMILIA</span></span>
+                <span class="pct" id="p-colegio"></span>
+                <span class="amount" id="a-colegio"></span>
+              </div>
+              <div class="budget-row" id="row-vis-ninera" style="display:none">
+                <span class="name">Niñera / jardín <span class="tag-fam">FAMILIA</span></span>
+                <span class="pct" id="p-ninera"></span>
+                <span class="amount" id="a-ninera"></span>
+              </div>
+              <div class="budget-row" id="row-vis-actividades" style="display:none">
+                <span class="name">Actividades / deportes hijos <span class="tag-fam">FAMILIA</span></span>
+                <span class="pct" id="p-actividades"></span>
+                <span class="amount" id="a-actividades"></span>
+              </div>
+              <div class="budget-row" id="row-vis-casaFam" style="display:none">
+                <span class="name">Casa más grande / barrio <span class="tag-fam">FAMILIA</span></span>
+                <span class="pct" id="p-casaFam"></span>
+                <span class="amount" id="a-casaFam"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- COL DERECHA: Fondos + Resumen -->
+          <div class="pres-col">
+            <div class="section-hdr">Fondos y Ahorros <span id="t-fondos"></span></div>
+            <div class="budget-row">
+              <span class="name">Fondo de Emergencia</span>
+              <span class="pct" id="p-fEmergencia"></span>
+              <span class="amount green" id="a-fEmergencia"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Fondo de Vacaciones</span>
+              <span class="pct" id="p-fVacaciones"></span>
+              <span class="amount green" id="a-fVacaciones"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Fondo de Inversiones</span>
+              <span class="pct" id="p-fInversiones"></span>
+              <span class="amount green" id="a-fInversiones"></span>
+            </div>
+            <div class="budget-row total-row">
+              <span class="name">Subtotal Fondos</span>
+              <span class="pct" id="p-totalFondos"></span>
+              <span class="amount green" id="a-totalFondos"></span>
+            </div>
+
+            <div class="section-hdr" style="margin-top:1px">Resumen</div>
+            <div class="budget-row">
+              <span class="name">Total ingresos</span>
+              <span class="pct">100%</span>
+              <span class="amount blue" id="res-ing"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Total gastos</span>
+              <span class="pct" id="res-gas-pct"></span>
+              <span class="amount red" id="res-gas"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Total inversión / fondos</span>
+              <span class="pct" id="res-inv-pct"></span>
+              <span class="amount green" id="res-inv"></span>
+            </div>
+            <div class="budget-row total-row">
+              <span class="name">Superávit / Déficit</span>
+              <span class="pct" id="res-sup-pct"></span>
+              <span class="amount" id="res-sup"></span>
+            </div>
+
+            <div class="section-hdr" style="margin-top:1px">Indicadores</div>
+            <div class="budget-row">
+              <span class="name">% destinado a gastos</span>
+              <span class="pct"></span>
+              <span class="amount" id="ind-gas"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">% destinado a inversión</span>
+              <span class="pct"></span>
+              <span class="amount green" id="ind-inv"></span>
+            </div>
+            <div class="budget-row">
+              <span class="name">Tasa de ahorro efectiva</span>
+              <span class="pct"></span>
+              <span class="amount" id="ind-ahorro"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: GASTOS DEL MES -->
+      <div id="view-gastos" style="display:none">
+        <div class="gastos-view">
+          <div class="gastos-hdr">
+            <span class="chart-title">Registro de gastos reales</span>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span class="gastos-mes" id="gastos-mes-label"></span>
+              <button class="btn-add-gasto" style="background:var(--s3);color:var(--text);border:1px solid var(--border)" onclick="closeMonth()">📌 Cerrar mes</button>
+            </div>
+          </div>
+
+          <div class="gasto-form">
+            <div class="field">
+              <label>Fecha</label>
+              <input type="date" id="gasto-fecha">
+            </div>
+            <div class="field">
+              <label>Categoría</label>
+              <select id="gasto-cat"></select>
+            </div>
+            <div class="field">
+              <label>Monto (ARS)</label>
+              <input type="number" id="gasto-monto" placeholder="0" min="0" step="1000">
+            </div>
+            <div class="field">
+              <label>Nota (opcional)</label>
+              <input type="text" id="gasto-nota" placeholder="Ej: Uber al aeropuerto" maxlength="60">
+            </div>
+            <button class="btn-add-gasto" onclick="addGasto()">+ Agregar</button>
+          </div>
+
+          <div class="gastos-kpis">
+            <div class="gk">
+              <div class="gk-label">Gastado este mes</div>
+              <div class="gk-val red" id="gk-total">$0</div>
+            </div>
+            <div class="gk">
+              <div class="gk-label">Disponible este mes</div>
+              <div class="gk-val" id="gk-disponible">$0</div>
+            </div>
+            <div class="gk">
+              <div class="gk-label">Cantidad de registros</div>
+              <div class="gk-val" id="gk-count">0</div>
+            </div>
+            <div class="gk">
+              <div class="gk-label">Categoría con más gasto</div>
+              <div class="gk-val" id="gk-top" style="font-size:.85rem">—</div>
+            </div>
+          </div>
+
+          <div class="pv-wrap">
+            <div class="pv-hdr">Presupuestado vs. Real por categoría</div>
+            <div id="pv-list"></div>
+          </div>
+
+          <div class="retiro-card">
+            <div class="rc-hdr">🔗 Conectar con el plan de retiro</div>
+            <div class="rc-row">
+              <div class="field">
+                <label>Tipo de cambio (ARS por USD)</label>
+                <input type="number" id="tipoCambio" placeholder="Ej: 1200" min="1" step="10">
+              </div>
+              <div class="rc-preview" id="retiro-preview">Superávit real: — · en USD: —</div>
+              <button class="btn-add-gasto" onclick="syncAhorroARetiro()">→ Enviar como ahorro mensual</button>
+            </div>
+            <div class="rc-note">Convierte tu superávit real de este mes (salario − gastos reales) a USD y lo carga como "Ahorro mensual" en el plan de retiro. Funciona automáticamente si abrís ambas apps desde el mismo dominio (comparten el almacenamiento del navegador); si no, copiá el valor en USD manualmente.</div>
+          </div>
+
+          <div class="gastos-table-wrap">
+            <table>
+              <thead>
+                <tr><th>Fecha</th><th>Categoría</th><th>Monto</th><th>Nota</th><th></th></tr>
+              </thead>
+              <tbody id="tbody-gastos"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: HISTÓRICO -->
+      <div id="view-historico" style="display:none">
+        <div class="proy-view">
+          <div class="chart-hdr">
+            <span class="chart-title">Evolución mensual (meses cerrados)</span>
+            <div style="display:flex;gap:12px;font-size:.68rem;color:var(--muted)">
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#f85149;border-radius:2px"></span>Gasto real</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#3fb950;border-radius:2px"></span>Superávit real</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#58a6ff;border-radius:2px"></span>Ingreso</span>
+            </div>
+          </div>
+          <div class="chart-wrap-inner">
+            <canvas id="chart-historico"></canvas>
+          </div>
+          <div class="proy-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th>Ingreso</th>
+                  <th>Presupuestado</th>
+                  <th>Gasto real</th>
+                  <th>Superávit real</th>
+                  <th>% Ahorro real</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tbody-historico"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: PROYECCIÓN -->
+      <div id="view-proyeccion" style="display:none">
+        <div class="proy-view">
+          <div class="chart-hdr">
+            <span class="chart-title">Evolución del salario y gastos totales (ARS nominales)</span>
+            <div style="display:flex;gap:12px;font-size:.68rem;color:var(--muted)">
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#58a6ff;border-radius:2px"></span>Salario</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#f85149;border-radius:2px"></span>Gastos</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#3fb950;border-radius:2px"></span>Inversión</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:3px;background:#bc8cff;border-radius:2px;border-top:2px dashed #bc8cff;height:0"></span>Sal. real</span>
+            </div>
+          </div>
+          <div class="chart-wrap-inner">
+            <canvas id="chart-proy"></canvas>
+          </div>
+          <div class="proy-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Año</th>
+                  <th>Salario Nominal</th>
+                  <th>Salario Real</th>
+                  <th>Gastos Totales</th>
+                  <th>Inversión</th>
+                  <th>Superávit</th>
+                  <th>% Ahorro</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-proy"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// ── FORMATO ───────────────────────────────────────────────────────────────
+function fmtARS(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(Math.round(n));
+  let s;
+  if (abs >= 1e6) s = '$' + (abs/1e6).toFixed(1) + 'M';
+  else if (abs >= 1e3) s = '$' + (abs/1e3).toFixed(0) + 'K';
+  else s = '$' + abs.toLocaleString('es-AR');
+  return n < 0 ? '-' + s : s;
+}
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+function fmtPctInt(n) { return Math.round(n * 100) + '%'; }
+
+// ── TABS ─────────────────────────────────────────────────────────────────
+let currentTab = 'presupuesto';
+function setTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  $('view-presupuesto').style.display = t === 'presupuesto' ? '' : 'none';
+  $('view-gastos').style.display      = t === 'gastos'      ? '' : 'none';
+  $('view-historico').style.display   = t === 'historico'   ? '' : 'none';
+  $('view-proyeccion').style.display  = t === 'proyeccion'  ? '' : 'none';
+  if (t === 'gastos') renderGastos();
+  if (t === 'historico') renderHistorico();
+  recalc();
+}
+
+// ── PERSISTENCIA ─────────────────────────────────────────────────────────
+const LS_PARAMS = 'presupuesto_params_v1';
+function saveParams() {
+  try {
+    const p = { sliders: {}, toggles: {} };
+    Object.keys(sliders).forEach(id => { const el = $(id); if (el) p.sliders[id] = el.value; });
+    toggles.forEach(id => { const el = $('tog-' + id); if (el) p.toggles[id] = el.checked; });
+    localStorage.setItem(LS_PARAMS, JSON.stringify(p));
+  } catch (e) {}
+}
+function loadParams() {
+  try {
+    const r = localStorage.getItem(LS_PARAMS);
+    if (!r) return;
+    const p = JSON.parse(r);
+    Object.entries(p.sliders || {}).forEach(([id, v]) => { const el = $(id); if (el) el.value = v; });
+    Object.entries(p.toggles || {}).forEach(([id, v]) => {
+      const el = $('tog-' + id);
+      if (el) { el.checked = v; const row = $('row-' + id); if (row) row.style.display = v ? '' : 'none'; }
+    });
+  } catch (e) {}
+}
+
+// ── SLIDERS ───────────────────────────────────────────────────────────────
+const sliders = {
+  salario:      v => fmtARS(v),
+  estudios:     v => fmtARS(v),
+  juntadas:     v => fmtARS(v),
+  gimnasio:     v => fmtARS(v),
+  nafta:        v => fmtARS(v),
+  suscripciones:v => fmtARS(v),
+  casa:         v => fmtARS(v),
+  cnc:          v => fmtARS(v),
+  fEmergencia:  v => fmtARS(v),
+  fVacaciones:  v => fmtARS(v),
+  fInversiones: v => fmtARS(v),
+  prepaga:      v => fmtARS(v),
+  auto:         v => fmtARS(v),
+  viajes:       v => fmtARS(v),
+  colegio:      v => fmtARS(v),
+  ninera:       v => fmtARS(v),
+  actividades:  v => fmtARS(v),
+  casaFam:      v => fmtARS(v),
+  crecSalario:  v => fmtPct(v),
+  inflacionARS: v => fmtPct(v),
+  anosProy:     v => `${v} años`,
+};
+
+Object.keys(sliders).forEach(id => {
+  const el = $(id);
+  if (!el) return;
+  const vEl = $('v-' + id);
+  const update = () => {
+    if (vEl) vEl.textContent = sliders[id](parseFloat(el.value));
+    recalc();
+    saveParams();
+  };
+  el.addEventListener('input', update);
+  if (vEl) vEl.textContent = sliders[id](parseFloat(el.value));
+});
+
+// ── TOGGLES ───────────────────────────────────────────────────────────────
+const toggles = ['prepaga','auto','viajes','colegio','ninera','actividades','casaFam'];
+toggles.forEach(id => {
+  const tog = $('tog-' + id);
+  tog.addEventListener('change', () => {
+    $('row-' + id).style.display = tog.checked ? '' : 'none';
+    recalc();
+    saveParams();
+  });
+});
+
+// ── CHART SETUP ───────────────────────────────────────────────────────────
+const ctxProy = $('chart-proy').getContext('2d');
+const chartProy = new Chart(ctxProy, {
+  type: 'line',
+  data: { labels: [], datasets: [] },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 180 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1c2333', borderColor: '#30363d', borderWidth: 1,
+        titleColor: '#7d8590', bodyColor: '#e6edf3', padding: 10,
+        callbacks: { label: c => ` ${c.dataset.label}: ${fmtARS(c.parsed.y)}` }
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#7d8590', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,.4)' }, border: { color: '#30363d' } },
+      y: {
+        ticks: { color: '#7d8590', font: { size: 10 }, callback: v => fmtARS(v) },
+        grid: { color: 'rgba(48,54,61,.4)' }, border: { color: '#30363d' }
+      }
+    }
+  }
+});
+
+const ctxHist = $('chart-historico').getContext('2d');
+const chartHist = new Chart(ctxHist, {
+  type: 'line',
+  data: { labels: [], datasets: [] },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 180 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1c2333', borderColor: '#30363d', borderWidth: 1,
+        titleColor: '#7d8590', bodyColor: '#e6edf3', padding: 10,
+        callbacks: { label: c => ` ${c.dataset.label}: ${fmtARS(c.parsed.y)}` }
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#7d8590', font: { size: 10 } }, grid: { color: 'rgba(48,54,61,.4)' }, border: { color: '#30363d' } },
+      y: {
+        ticks: { color: '#7d8590', font: { size: 10 }, callback: v => fmtARS(v) },
+        grid: { color: 'rgba(48,54,61,.4)' }, border: { color: '#30363d' }
+      }
+    }
+  }
+});
+
+// ── GASTOS DEL MES ────────────────────────────────────────────────────────
+const LS_GASTOS = 'presupuesto_gastos_v1';
+const GASTO_CATS = [
+  { id: 'estudios',      label: 'Estudios y aprendizaje' },
+  { id: 'juntadas',      label: 'Juntadas / salidas / comidas' },
+  { id: 'gimnasio',      label: 'Gimnasio' },
+  { id: 'nafta',         label: 'Nafta / transporte' },
+  { id: 'suscripciones', label: 'Suscripciones' },
+  { id: 'casa',          label: 'Casa (alquiler / expensas)' },
+  { id: 'cnc',           label: 'Varios / imprevistos' },
+  { id: 'prepaga',       label: 'Prepaga / salud' },
+  { id: 'auto',          label: 'Auto (cuota / seguro)' },
+  { id: 'viajes',        label: 'Viajes' },
+  { id: 'colegio',       label: 'Colegio / educación hijos' },
+  { id: 'ninera',        label: 'Niñera / jardín' },
+  { id: 'actividades',   label: 'Actividades / deportes hijos' },
+  { id: 'casaFam',       label: 'Casa más grande / barrio' },
+  { id: 'otro',          label: 'Otro' },
+];
+const catLabel = id => (GASTO_CATS.find(c => c.id === id) || {}).label || id;
+
+function monthKey(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+}
+function monthLabelShort(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' }).replace('.', '');
+}
+function loadGastosAll() {
+  try { return JSON.parse(localStorage.getItem(LS_GASTOS) || '{}'); } catch (e) { return {}; }
+}
+function saveGastosAll(all) {
+  try { localStorage.setItem(LS_GASTOS, JSON.stringify(all)); } catch (e) {}
+}
+function initGastoCatSelect() {
+  const sel = $('gasto-cat');
+  sel.innerHTML = GASTO_CATS.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+}
+function addGasto() {
+  const fecha = $('gasto-fecha').value;
+  const cat = $('gasto-cat').value;
+  const monto = parseFloat($('gasto-monto').value);
+  const nota = $('gasto-nota').value.trim();
+  if (!fecha) { alert('Elegí una fecha.'); return; }
+  if (!monto || monto <= 0) { alert('Cargá un monto válido.'); return; }
+  const key = monthKey(new Date(fecha + 'T00:00:00'));
+  const all = loadGastosAll();
+  if (!all[key]) all[key] = [];
+  all[key].push({ id: Date.now(), fecha, cat, monto, nota });
+  all[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  saveGastosAll(all);
+  $('gasto-monto').value = '';
+  $('gasto-nota').value = '';
+  renderGastos();
+}
+function removeGasto(id) {
+  const all = loadGastosAll();
+  const key = monthKey();
+  if (!all[key]) return;
+  all[key] = all[key].filter(g => g.id !== id);
+  saveGastosAll(all);
+  renderGastos();
+}
+const PV_CAT_IDS = ['estudios','juntadas','gimnasio','nafta','suscripciones','casa','cnc','prepaga','auto','viajes','colegio','ninera','actividades','casaFam'];
+const PV_EXTRA_TOGGLE = ['prepaga','auto','viajes','colegio','ninera','actividades','casaFam'];
+function getPresupuestoCat(id) {
+  if (PV_EXTRA_TOGGLE.includes(id)) return tog(id) ? g(id) : 0;
+  return g(id);
+}
+function renderGastos() {
+  const key = monthKey();
+  const all = loadGastosAll();
+  const list = all[key] || [];
+  $('gastos-mes-label').textContent = monthLabel(key);
+
+  const total = list.reduce((s, g) => s + g.monto, 0);
+  $('gk-total').textContent = fmtARS(total);
+  $('gk-count').textContent = list.length;
+
+  const byCat = {};
+  list.forEach(g => { byCat[g.cat] = (byCat[g.cat] || 0) + g.monto; });
+  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+  $('gk-top').textContent = top ? `${catLabel(top[0])} (${fmtARS(top[1])})` : '—';
+
+  // ── PRESUPUESTADO VS. REAL ──
+  let totalPresu = 0, totalRealPresu = 0;
+  const pvRows = [];
+  PV_CAT_IDS.forEach(id => {
+    const presu = getPresupuestoCat(id);
+    const real = byCat[id] || 0;
+    if (presu <= 0 && real <= 0) return;
+    totalPresu += presu;
+    totalRealPresu += real;
+    const pct = presu > 0 ? real / presu : (real > 0 ? 1.3 : 0);
+    const color = presu <= 0 ? 'var(--red)' : pct > 1 ? 'var(--red)' : pct >= 0.8 ? 'var(--orange)' : 'var(--green)';
+    pvRows.push({ id, presu, real, pct, color });
+  });
+  const otroReal = byCat['otro'] || 0;
+  if (otroReal > 0) pvRows.push({ id: 'otro', presu: 0, real: otroReal, pct: 1.3, color: 'var(--red)' });
+
+  const disponible = totalPresu - totalRealPresu - otroReal;
+  const dEl = $('gk-disponible');
+  dEl.textContent = fmtARS(disponible);
+  dEl.className = 'gk-val ' + (disponible >= 0 ? 'green' : 'red');
+
+  updateRetiroPreview();
+
+  const pvList = $('pv-list');
+  if (!pvRows.length) {
+    pvList.innerHTML = `<div class="pv-empty">Cargá algún gasto o definí presupuesto en las categorías para ver la comparación acá.</div>`;
+  } else {
+    pvList.innerHTML = pvRows.map(r => {
+      const noPresu = r.presu <= 0;
+      const label = noPresu ? 'sin presupuesto asignado' : fmtPctInt(r.pct);
+      return `
+        <div class="pv-row">
+          <div class="pv-row-top">
+            <span class="pv-name">${catLabel(r.id)}</span>
+            <span class="pv-nums"><b>${fmtARS(r.real)}</b> / ${noPresu ? '—' : fmtARS(r.presu)}<span class="pv-pct" style="color:${r.color}">${label}</span></span>
+          </div>
+          <div class="pv-bar"><div class="pv-fill" style="width:${Math.min(r.pct, 1) * 100}%;background:${r.color}"></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  const tbody = $('tbody-gastos');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="gastos-empty">Todavía no cargaste gastos este mes. Usá el formulario de arriba para empezar.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(g => `
+    <tr>
+      <td style="color:var(--muted)">${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</td>
+      <td><span class="cat-chip">${catLabel(g.cat)}</span></td>
+      <td style="font-weight:600">${fmtARS(g.monto)}</td>
+      <td style="color:var(--muted)">${g.nota || '—'}</td>
+      <td><button class="del-gasto-btn" onclick="removeGasto(${g.id})" title="Eliminar">✕</button></td>
+    </tr>`).join('');
+}
+
+// ── HISTÓRICO / SNAPSHOTS MENSUALES ─────────────────────────────────────
+const LS_SNAPSHOTS = 'presupuesto_snapshots_v1';
+function loadSnapshots() {
+  try { return JSON.parse(localStorage.getItem(LS_SNAPSHOTS) || '{}'); } catch (e) { return {}; }
+}
+function saveSnapshots(all) {
+  try { localStorage.setItem(LS_SNAPSHOTS, JSON.stringify(all)); } catch (e) {}
+}
+function closeMonth() {
+  const key = monthKey();
+  const salario = g('salario');
+  let totalPresu = 0;
+  PV_CAT_IDS.forEach(id => { totalPresu += getPresupuestoCat(id); });
+
+  const all = loadGastosAll();
+  const list = all[key] || [];
+  const gastoReal = list.reduce((s, x) => s + x.monto, 0);
+  const byCat = {};
+  list.forEach(x => { byCat[x.cat] = (byCat[x.cat] || 0) + x.monto; });
+  const superavitReal = salario - gastoReal;
+
+  const snaps = loadSnapshots();
+  const already = !!snaps[key];
+  if (!confirm(already
+    ? `Ya cerraste ${monthLabel(key)} antes. ¿Actualizar el snapshot con los datos actuales?`
+    : `¿Cerrar ${monthLabel(key)} y guardar el resumen en el histórico?\n\nIngreso: ${fmtARS(salario)}\nGasto real: ${fmtARS(gastoReal)}\nSuperávit real: ${fmtARS(superavitReal)}\n\nEsto no borra tus gastos cargados, solo guarda una foto del mes.`)) return;
+
+  snaps[key] = { mes: key, salario, totalPresu, gastoReal, superavitReal, byCat, closedAt: Date.now() };
+  saveSnapshots(snaps);
+  alert('Mes guardado en el histórico ✓');
+  if (currentTab === 'historico') renderHistorico();
+}
+function deleteSnapshot(key) {
+  const snaps = loadSnapshots();
+  delete snaps[key];
+  saveSnapshots(snaps);
+  renderHistorico();
+}
+function renderHistorico() {
+  const snaps = loadSnapshots();
+  const keys = Object.keys(snaps).sort();
+  const tbody = $('tbody-historico');
+
+  if (!keys.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="gastos-empty">Todavía no cerraste ningún mes. Andá a "Gastos del mes" y usá el botón 📌 Cerrar mes cuando termine el período.</td></tr>`;
+    chartHist.data.labels = [];
+    chartHist.data.datasets = [];
+    chartHist.update();
+    return;
+  }
+
+  const labels = keys.map(k => monthLabelShort(k));
+  const dataIng = keys.map(k => snaps[k].salario);
+  const dataGas = keys.map(k => snaps[k].gastoReal);
+  const dataSup = keys.map(k => snaps[k].superavitReal);
+
+  chartHist.data.labels = labels;
+  chartHist.data.datasets = [
+    { label: 'Ingreso', data: dataIng, borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,.06)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false, tension: 0.25 },
+    { label: 'Gasto real', data: dataGas, borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,.05)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false, tension: 0.25 },
+    { label: 'Superávit real', data: dataSup, borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,.08)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: true, tension: 0.25 },
+  ];
+  chartHist.update();
+
+  tbody.innerHTML = keys.map(k => {
+    const s = snaps[k];
+    const supClass = s.superavitReal >= 0 ? 'surplus-pos' : 'surplus-neg';
+    const pctAh = s.salario > 0 ? s.superavitReal / s.salario : 0;
+    return `
+      <tr>
+        <td style="text-transform:capitalize">${monthLabel(k)}</td>
+        <td style="color:var(--accent);font-weight:500">${fmtARS(s.salario)}</td>
+        <td style="color:var(--muted)">${fmtARS(s.totalPresu)}</td>
+        <td style="color:var(--red)">${fmtARS(s.gastoReal)}</td>
+        <td class="${supClass}">${fmtARS(s.superavitReal)}</td>
+        <td style="color:var(--muted)">${fmtPct(pctAh)}</td>
+        <td><button class="del-gasto-btn" onclick="deleteSnapshot('${k}')" title="Eliminar snapshot">✕</button></td>
+      </tr>`;
+  }).join('');
+}
+
+// ── TIPO DE CAMBIO Y CONEXIÓN CON EL PLAN DE RETIRO ─────────────────────
+const LS_TC = 'presupuesto_tc_v1';
+const LS_RETIRO_PARAMS = 'planRetiro_params_v1'; // clave compartida con el plan de retiro (mismo dominio)
+function fmtUSD(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(Math.round(n));
+  return (n < 0 ? '-US$' : 'US$') + abs.toLocaleString('en-US');
+}
+function tc() { return parseFloat($('tipoCambio').value) || 0; }
+function saveTC() { try { localStorage.setItem(LS_TC, $('tipoCambio').value || ''); } catch (e) {} }
+function loadTC() { try { const r = localStorage.getItem(LS_TC); if (r) $('tipoCambio').value = r; } catch (e) {} }
+function computeSuperavitRealActual() {
+  const key = monthKey();
+  const all = loadGastosAll();
+  const list = all[key] || [];
+  const gastoReal = list.reduce((s, x) => s + x.monto, 0);
+  return g('salario') - gastoReal;
+}
+function updateRetiroPreview() {
+  const sup = computeSuperavitRealActual();
+  const rate = tc();
+  const usd = rate > 0 ? sup / rate : null;
+  $('retiro-preview').innerHTML = `Superávit real: <b>${fmtARS(sup)}</b> · en USD: <b>${usd !== null ? fmtUSD(usd) : '—'}</b>`;
+}
+function syncAhorroARetiro() {
+  const rate = tc();
+  if (!rate || rate <= 0) { alert('Ingresá un tipo de cambio válido primero (ARS por USD).'); return; }
+  const sup = computeSuperavitRealActual();
+  if (sup <= 0) {
+    if (!confirm('Tu superávit real de este mes es negativo o cero, así que se enviaría $0 como ahorro mensual. ¿Continuar igual?')) return;
+  }
+  const usd = Math.max(0, Math.round(sup / rate));
+  try {
+    const raw = localStorage.getItem(LS_RETIRO_PARAMS);
+    const p = raw ? JSON.parse(raw) : {};
+    p.ahorroMensual = usd;
+    localStorage.setItem(LS_RETIRO_PARAMS, JSON.stringify(p));
+    alert(`Listo. Ahorro mensual actualizado a ${fmtUSD(usd)} en el plan de retiro.\n\nAbrí (o refrescá) el plan de retiro para verlo reflejado.`);
+  } catch (e) {
+    alert('No pude escribir en el almacenamiento local del navegador. Asegurate de usar el mismo navegador donde tenés abierto el plan de retiro.');
+  }
+}
+
+// ── BACKUP: EXPORTAR / IMPORTAR ─────────────────────────────────────────
+const BACKUP_KEYS = [LS_PARAMS, LS_GASTOS, LS_SNAPSHOTS, LS_TC];
+function exportBackup() {
+  const data = { exportedAt: new Date().toISOString(), app: 'presupuesto_personal', data: {} };
+  BACKUP_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) data.data[k] = v; });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `presupuesto-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importBackup(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      const data = parsed.data || parsed;
+      if (!confirm('Esto va a reemplazar tus datos actuales (presupuesto, gastos, histórico y tipo de cambio) por los del backup. ¿Continuar?')) return;
+      Object.entries(data).forEach(([k, v]) => { if (BACKUP_KEYS.includes(k)) localStorage.setItem(k, v); });
+      alert('Backup restaurado ✓. La página se va a recargar.');
+      location.reload();
+    } catch (e) {
+      alert('El archivo no parece un backup válido de esta app.');
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+// ── RECALC ────────────────────────────────────────────────────────────────
+function g(id) { return parseFloat($(id).value); }
+function tog(id) { return $('tog-' + id).checked; }
+
+function recalc() {
+  const salario = g('salario');
+  const estudios = g('estudios');
+  const juntadas = g('juntadas');
+  const gimnasio = g('gimnasio');
+  const nafta = g('nafta');
+  const suscripciones = g('suscripciones');
+  const casa = g('casa');
+  const cnc = g('cnc');
+  const fEm = g('fEmergencia');
+  const fVac = g('fVacaciones');
+  const fInv = g('fInversiones');
+
+  // extras
+  const prepaga = tog('prepaga') ? g('prepaga') : 0;
+  const auto_ = tog('auto') ? g('auto') : 0;
+  const viajes = tog('viajes') ? g('viajes') : 0;
+
+  // familia
+  const colegio = tog('colegio') ? g('colegio') : 0;
+  const ninera = tog('ninera') ? g('ninera') : 0;
+  const actividades = tog('actividades') ? g('actividades') : 0;
+  const casaFam = tog('casaFam') ? g('casaFam') : 0;
+
+  const totalFijos = estudios;
+  const totalVars = juntadas + gimnasio + nafta + suscripciones + casa + cnc;
+  const totalExtras = prepaga + auto_ + viajes;
+  const totalFamilia = colegio + ninera + actividades + casaFam;
+  const totalGastos = totalFijos + totalVars + totalExtras + totalFamilia;
+  const totalFondos = fEm + fVac + fInv;
+  const superavit = salario - totalGastos - totalFondos;
+
+  const pct = x => salario > 0 ? x / salario : 0;
+
+  // ── KPIs ──
+  $('kpi-ing').textContent = fmtARS(salario);
+  $('kpi-gas').textContent = fmtARS(totalGastos);
+  $('kpi-gas-pct').textContent = fmtPctInt(pct(totalGastos)) + ' del ingreso';
+  $('kpi-inv').textContent = fmtARS(totalFondos);
+  $('kpi-inv-pct').textContent = fmtPctInt(pct(totalFondos)) + ' del ingreso';
+
+  const supEl = $('kpi-sup');
+  supEl.textContent = fmtARS(superavit);
+  supEl.className = 'kpi-val ' + (superavit >= 0 ? 'green' : 'red');
+  $('kpi-sup-sub').textContent = superavit >= 0 ? 'libre disponible' : '⚠ déficit';
+
+  // salario real proyectado
+  const anos = g('anosProy');
+  const crecSal = g('crecSalario');
+  const inflARS = g('inflacionARS');
+  const salNomFut = salario * Math.pow(1 + crecSal, anos);
+  const salRealFut = salNomFut / Math.pow(1 + inflARS, anos);
+  $('kpi-real').textContent = fmtARS(salRealFut);
+  $('kpi-real-sub').textContent = `en ${anos} años (poder adquisitivo hoy)`;
+
+  // ── BARRA DISTRIBUCIÓN ──
+  const segs = [
+    { label: 'Gastos fijos', val: totalFijos, color: '#f85149' },
+    { label: 'Gastos variables', val: totalVars, color: '#d29922' },
+    { label: 'Extras', val: totalExtras, color: '#bc8cff' },
+    { label: 'Familia', val: totalFamilia, color: '#39d353' },
+    { label: 'Fondos / Inv.', val: totalFondos, color: '#3fb950' },
+    { label: 'Libre', val: Math.max(0, superavit), color: '#58a6ff' },
+  ];
+  const total = segs.reduce((a, s) => a + s.val, 0) || 1;
+  $('dist-bar').innerHTML = segs.map(s =>
+    `<div class="dist-seg" style="width:${(s.val/total*100).toFixed(1)}%;background:${s.color}"></div>`
+  ).join('');
+  $('dist-legend').innerHTML = segs.filter(s => s.val > 0).map(s =>
+    `<div class="dist-leg-item"><div class="dist-dot" style="background:${s.color}"></div>${s.label}: ${fmtPctInt(s.val/salario)}</div>`
+  ).join('');
+
+  // ── PRESUPUESTO ROWS ──
+  const rows = [
+    ['salario', salario],
+    ['estudios', estudios],
+    ['juntadas', juntadas],
+    ['gimnasio', gimnasio],
+    ['nafta', nafta],
+    ['suscripciones', suscripciones],
+    ['casa', casa],
+    ['cnc', cnc],
+    ['fEmergencia', fEm],
+    ['fVacaciones', fVac],
+    ['fInversiones', fInv],
+    ['prepaga', prepaga],
+    ['auto', auto_],
+    ['viajes', viajes],
+    ['colegio', colegio],
+    ['ninera', ninera],
+    ['actividades', actividades],
+    ['casaFam', casaFam],
+  ];
+  rows.forEach(([id, val]) => {
+    const pEl = $('p-' + id);
+    const aEl = $('a-' + id);
+    if (pEl) pEl.textContent = fmtPctInt(pct(val));
+    if (aEl) aEl.textContent = fmtARS(val);
+  });
+
+  // totales de secciones
+  $('t-ingresos').textContent = fmtARS(salario);
+  $('t-fijos').textContent = fmtARS(totalFijos);
+  $('t-variables').textContent = fmtARS(totalVars);
+  $('t-fondos').textContent = fmtARS(totalFondos);
+  $('a-totalFondos').textContent = fmtARS(totalFondos);
+  $('p-totalFondos').textContent = fmtPctInt(pct(totalFondos));
+
+  // extras visibility
+  const hasExtras = prepaga || auto_ || viajes;
+  $('section-extras').style.display = hasExtras ? '' : 'none';
+  if (hasExtras) $('t-extras').textContent = fmtARS(totalExtras);
+  ['prepaga','auto','viajes'].forEach(id => {
+    const v = id === 'auto' ? auto_ : id === 'viajes' ? viajes : prepaga;
+    $('row-vis-' + id).style.display = tog(id) ? '' : 'none';
+  });
+
+  // familia visibility
+  const hasFam = colegio || ninera || actividades || casaFam;
+  $('section-familia').style.display = hasFam ? '' : 'none';
+  if (hasFam) $('t-familia').textContent = fmtARS(totalFamilia);
+  ['colegio','ninera','actividades','casaFam'].forEach(id => {
+    $('row-vis-' + id).style.display = tog(id) ? '' : 'none';
+  });
+
+  // resumen
+  $('res-ing').textContent = fmtARS(salario);
+  $('res-gas').textContent = fmtARS(totalGastos);
+  $('res-gas-pct').textContent = fmtPctInt(pct(totalGastos));
+  $('res-inv').textContent = fmtARS(totalFondos);
+  $('res-inv-pct').textContent = fmtPctInt(pct(totalFondos));
+  const supResEl = $('res-sup');
+  supResEl.textContent = fmtARS(superavit);
+  supResEl.style.color = superavit >= 0 ? 'var(--green)' : 'var(--red)';
+  $('res-sup-pct').textContent = fmtPctInt(Math.abs(pct(superavit)));
+
+  // indicadores
+  $('ind-gas').textContent = fmtPct(pct(totalGastos));
+  $('ind-inv').textContent = fmtPct(pct(totalFondos));
+  $('ind-ahorro').textContent = fmtPct(pct(Math.max(0, superavit) + totalFondos));
+
+  // ── GASTOS DEL MES (vivo si estás en esa pestaña) ──
+  if (currentTab === 'gastos') renderGastos();
+
+  // ── PROYECCIÓN ──
+  if (currentTab === 'proyeccion') {
+    const labels = [];
+    const dataSal = [], dataGas = [], dataInv = [], dataSalReal = [];
+    const tableRows = [];
+
+    let salN = salario;
+    // gastos escalan con inflación
+    let gastosN = totalGastos;
+    let fondosN = totalFondos;
+
+    for (let i = 0; i <= anos; i++) {
+      const deflactor = Math.pow(1 + inflARS, i);
+      const salR = salN / deflactor;
+      labels.push(i === 0 ? 'Hoy' : `+${i}a`);
+      dataSal.push(salN);
+      dataGas.push(gastosN);
+      dataInv.push(fondosN);
+      dataSalReal.push(salR);
+      const sup = salN - gastosN - fondosN;
+      tableRows.push({ ano: i, salN, salR, gastosN, fondosN, sup });
+
+      if (i < anos) {
+        salN *= (1 + crecSal);
+        gastosN *= (1 + inflARS);
+        fondosN *= (1 + inflARS);
+      }
+    }
+
+    chartProy.data.labels = labels;
+    chartProy.data.datasets = [
+      { label: 'Salario', data: dataSal, borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,.06)', borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, fill: true, tension: 0.3 },
+      { label: 'Gastos totales', data: dataGas, borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,.05)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 },
+      { label: 'Inversión / Fondos', data: dataInv, borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,.05)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 },
+      { label: 'Salario real (hoy)', data: dataSalReal, borderColor: '#bc8cff', borderDash: [5,3], borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+    ];
+    chartProy.update();
+
+    const tbody = $('tbody-proy');
+    tbody.innerHTML = '';
+    tableRows.forEach(r => {
+      const sup = r.sup;
+      const supClass = sup >= 0 ? 'surplus-pos' : 'surplus-neg';
+      const pctAh = r.salN > 0 ? (r.fondosN / r.salN) : 0;
+      tbody.innerHTML += `
+        <tr>
+          <td>${r.ano === 0 ? 'Hoy' : '+' + r.ano}</td>
+          <td style="color:var(--accent);font-weight:500">${fmtARS(r.salN)}</td>
+          <td style="color:var(--purple)">${fmtARS(r.salR)}</td>
+          <td style="color:var(--red)">${fmtARS(r.gastosN)}</td>
+          <td style="color:var(--green)">${fmtARS(r.fondosN)}</td>
+          <td class="${supClass}">${fmtARS(sup)}</td>
+          <td style="color:var(--muted)">${fmtPct(pctAh)}</td>
+        </tr>`;
+    });
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+loadParams();
+Object.keys(sliders).forEach(id => {
+  const el = $(id), vEl = $('v-' + id);
+  if (el && vEl) vEl.textContent = sliders[id](parseFloat(el.value));
+});
+initGastoCatSelect();
+$('gasto-fecha').value = new Date().toISOString().slice(0, 10);
+loadTC();
+$('tipoCambio').addEventListener('input', () => { saveTC(); updateRetiroPreview(); });
+renderGastos();
+recalc();
+</script>
+</body>
+</html>
