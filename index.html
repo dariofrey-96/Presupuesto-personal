@@ -70,6 +70,29 @@ header .sub { font-size: .75rem; color: var(--muted); font-family: 'JetBrains Mo
   border-color: var(--border);
 }
 
+.sidebar-toggle {
+  display: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: .72rem;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+}
+.aside-close {
+  display: none;
+  align-self: flex-end;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: .72rem;
+  cursor: pointer;
+}
+
 /* ── LAYOUT ── */
 .shell {
   display: grid;
@@ -340,6 +363,32 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
 .del-gasto-btn:hover { color: var(--red); background: rgba(248,81,73,.1); }
 .gastos-empty { padding: 24px; text-align: center; color: var(--muted); font-size: .75rem; }
 .cat-chip { font-size: .62rem; padding: 2px 7px; border-radius: 10px; background: var(--s3); color: var(--text); }
+
+/* ── MOBILE ── */
+@media (max-width: 768px) {
+  header { padding: 10px 14px; flex-wrap: wrap; gap: 8px; }
+  header h1 { font-size: .9rem; }
+  header .sub { display: none; }
+  .header-right { order: 3; width: 100%; justify-content: flex-end; }
+  .tabs { flex-wrap: wrap; gap: 4px; }
+  .tab { padding: 5px 10px; font-size: .68rem; }
+  .sidebar-toggle { display: block; }
+
+  .shell { grid-template-columns: 1fr; }
+  aside {
+    display: none; position: fixed; inset: 0; z-index: 150;
+    background: var(--bg); padding: 14px; overflow-y: auto;
+  }
+  aside.open { display: flex; }
+  .aside-close { display: block; }
+
+  .gastos-kpis { grid-template-columns: repeat(2, 1fr); }
+  .gasto-form { grid-template-columns: 1fr; }
+  .btn-add-gasto { width: 100%; }
+  .rc-row { flex-direction: column; align-items: stretch; }
+  .retiro-card input { width: 100%; }
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
 </style>
 </head>
 <body>
@@ -356,6 +405,7 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
     <button class="tab" onclick="setTab('proyeccion')">Proyección</button>
   </div>
   <div class="header-right">
+    <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">⚙ Parámetros</button>
     <button class="icon-btn" onclick="exportBackup()" title="Descargar todos los datos en un archivo JSON">⬇ Backup</button>
     <button class="icon-btn" onclick="$('import-file-input').click()" title="Restaurar datos desde un backup JSON">⬆ Restaurar</button>
     <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="importBackup(event)">
@@ -363,7 +413,9 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
 </header>
 
 <div class="shell">
-  <aside>
+  <aside id="aside">
+    <button class="aside-close" onclick="toggleSidebar()">✕ Cerrar</button>
+
 
     <div>
       <div class="grp-label">Ingresos</div>
@@ -934,6 +986,10 @@ function fmtPctInt(n) { return Math.round(n * 100) + '%'; }
 
 // ── TABS ─────────────────────────────────────────────────────────────────
 let currentTab = 'presupuesto';
+function toggleSidebar() {
+  const a = $('aside'), btn = $('sidebar-toggle'), open = a.classList.toggle('open');
+  btn.textContent = open ? '✕ Cerrar' : '⚙ Parámetros';
+}
 function setTab(t) {
   currentTab = t;
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
@@ -944,6 +1000,8 @@ function setTab(t) {
   $('view-proyeccion').style.display  = t === 'proyeccion'  ? '' : 'none';
   if (t === 'gastos') renderGastos();
   if (t === 'historico') renderHistorico();
+  const a = $('aside');
+  if (a.classList.contains('open')) toggleSidebar();
   recalc();
 }
 
