@@ -62,6 +62,16 @@ Sección `── ALERTAS DE CATEGORÍA ──` en el script principal, más el m
 
 **Retoques que el usuario todavía no evaluó**: si el modal centrado resulta invasivo (alternativa: toast desde arriba), si conviene más de un umbral de aviso, y el tono de los textos.
 
+### Pagos repartidos en varios meses (implementado 2026-08-13)
+
+Nació de un problema real del usuario: paga el gimnasio o el mantenimiento del auto de una sola vez por 3-4 meses, y el mes del pago disparaba una falsa alarma de exceso. Ahora el formulario de gastos tiene un select **"¿Cuántos meses cubre?"** y el pago se reparte en una parte por mes.
+
+- `addGasto()` usa `repartirEnMeses()` (el sobrante del redondeo va al primer mes, la suma siempre da exacto) y `fechaDesplazada()` (clampea el día al último del mes, ej. 31/01 → 28/02).
+- Genera **una entrada por mes**, cada una en el bucket de su mes, unidas por `grupo`. Campos extra: `grupo`, `cuota`, `cuotas`, `montoTotal`, `fechaPago`. Los gastos de un solo mes se guardan igual que antes (sin esos campos).
+- Decisión de diseño: **se prorratea en todos lados** (KPIs, comparativa, alertas, superávit, snapshots), no solo en la comparativa. La app es mensual de punta a punta y mezclar caja con devengado daría dos "gastado este mes" distintos. **Efecto colateral conocido**: el superávit del mes del pago queda mejor que la caja real, y eso es lo que alimenta `syncAhorroARetiro()`. Avisado al usuario el 2026-08-13; si le molesta, ahí está la palanca.
+- `removeGasto()` borra el grupo entero (con `confirm`), porque media parte de un pago repartido no significa nada.
+- `renderFuturoNote()` muestra en la pestaña de gastos cuánto ya está cubierto en meses siguientes, para que no parezca que la plata se perdió.
+
 ## Ideas pendientes
 
 Confirmadas por el usuario (2026-08-07), en orden de prioridad. La #1 ya está hecha:

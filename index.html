@@ -642,6 +642,20 @@ html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
 .ab-txt { flex: 1; }
 .ab-txt b { font-weight: 650; }
 .ab-pct { font-weight: 700; font-size: .8rem; flex-shrink: 0; }
+
+/* ── PAGOS REPARTIDOS EN VARIOS MESES ─────────────────────────────────── */
+.cuota-chip {
+  display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 100px;
+  font-size: .6rem; font-weight: 600; letter-spacing: .02em; white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.futuro-note {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 10px 12px; margin-bottom: 14px;
+  border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--surface);
+  font-size: .78rem; color: var(--muted); line-height: 1.45;
+}
+.futuro-note b { color: var(--text); font-weight: 650; }
 </style>
 <script>
 // Aplica el tema guardado ANTES de pintar, para evitar el flash de tema incorrecto.
@@ -1356,6 +1370,19 @@ html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
                 <label>Categoría</label>
                 <select id="gasto-cat"></select>
               </div>
+              <div class="field">
+                <label>¿Cuántos meses cubre?</label>
+                <select id="gasto-meses">
+                  <option value="1" selected>Solo este mes</option>
+                  <option value="2">2 meses</option>
+                  <option value="3">3 meses</option>
+                  <option value="4">4 meses</option>
+                  <option value="5">5 meses</option>
+                  <option value="6">6 meses</option>
+                  <option value="9">9 meses</option>
+                  <option value="12">12 meses (un año)</option>
+                </select>
+              </div>
             </div>
             <div class="gasto-form-row">
               <div class="field">
@@ -1388,6 +1415,8 @@ html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
               <div class="gk-val" id="gk-top" style="font-size:.85rem">—</div>
             </div>
           </div>
+
+          <div class="futuro-note" id="futuro-note" style="display:none"></div>
 
           <div class="pv-wrap">
             <div class="pv-hdr">Presupuestado vs. Real por categoría</div>
@@ -1704,21 +1733,48 @@ function initGastoCatSelect() {
   const sel = $('gasto-cat');
   sel.innerHTML = GASTO_CATS.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
 }
+// Un pago único puede corresponder a varios meses (ej. pagás 3 meses de gimnasio
+// juntos). Lo repartimos en una parte por mes, así el mes del pago no queda
+// inflado y los meses siguientes ya lo tienen cubierto.
+function repartirEnMeses(total, meses) {
+  const base = Math.round(total / meses);
+  const partes = new Array(meses).fill(base);
+  partes[0] += total - base * meses;   // el resto del redondeo va al primer mes
+  return partes;
+}
+function fechaDesplazada(fechaISO, nMeses) {
+  const b = new Date(fechaISO + 'T00:00:00');
+  const d = new Date(b.getFullYear(), b.getMonth() + nMeses, 1);
+  const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(b.getDate(), ultimoDia));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function addGasto() {
   const fecha = $('gasto-fecha').value;
   const cat = $('gasto-cat').value;
   const monto = parseFloat($('gasto-monto').value);
   const nota = $('gasto-nota').value.trim();
+  const meses = Math.max(1, parseInt(($('gasto-meses') || {}).value, 10) || 1);
   if (!fecha) { alert('Elegí una fecha.'); return; }
   if (!monto || monto <= 0) { alert('Cargá un monto válido.'); return; }
-  const key = monthKey(new Date(fecha + 'T00:00:00'));
+
   const all = loadGastosAll();
-  if (!all[key]) all[key] = [];
-  all[key].push({ id: Date.now(), fecha, cat, monto, nota });
-  all[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const grupo = meses > 1 ? 'g' + Date.now() : null;
+  repartirEnMeses(monto, meses).forEach((parte, i) => {
+    const f = fechaDesplazada(fecha, i);
+    const key = monthKey(new Date(f + 'T00:00:00'));
+    if (!all[key]) all[key] = [];
+    const item = { id: Date.now() + i, fecha: f, cat, monto: parte, nota };
+    if (grupo) Object.assign(item, { grupo, cuota: i + 1, cuotas: meses, montoTotal: monto, fechaPago: fecha });
+    all[key].push(item);
+    all[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  });
   saveGastosAll(all);
+
   $('gasto-monto').value = '';
   $('gasto-nota').value = '';
+  if ($('gasto-meses')) $('gasto-meses').value = '1';
   renderGastos();
   chequearAlertaCat(cat);
 }
@@ -1726,9 +1782,39 @@ function removeGasto(id) {
   const all = loadGastosAll();
   const key = monthKey();
   if (!all[key]) return;
-  all[key] = all[key].filter(g => g.id !== id);
+  const target = all[key].find(g => g.id === id);
+  if (!target) return;
+  if (target.grupo) {
+    // Media parte de un pago repartido no tiene sentido: se borran todas juntas.
+    const msg = `Este gasto es parte de un pago de ${fmtARS(target.montoTotal)} repartido en ${target.cuotas} meses.\n\nSe van a borrar las ${target.cuotas} partes, incluidas las de los meses que vienen. ¿Seguir?`;
+    if (!confirm(msg)) return;
+    Object.keys(all).forEach(k => { all[k] = (all[k] || []).filter(g => g.grupo !== target.grupo); });
+  } else {
+    all[key] = all[key].filter(g => g.id !== id);
+  }
   saveGastosAll(all);
   renderGastos();
+}
+// Partes de pagos repartidos que caen en meses posteriores al actual.
+function comprometidoFuturo() {
+  const all = loadGastosAll();
+  const actual = monthKey();
+  let total = 0;
+  const meses = [];
+  Object.keys(all).sort().forEach(k => {
+    if (k <= actual) return;
+    const suma = (all[k] || []).reduce((s, g) => g.grupo ? s + g.monto : s, 0);
+    if (suma > 0) { total += suma; meses.push(k); }
+  });
+  return { total, meses };
+}
+function renderFuturoNote() {
+  const el = $('futuro-note');
+  if (!el) return;
+  const { total, meses } = comprometidoFuturo();
+  if (!total) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = `<span>📅</span><span>Ya pagaste <b>${fmtARS(total)}</b> que corresponde a ${meses.map(monthLabelShort).join(', ')}. Va a aparecer solo cuando llegues a esos meses, así que no hace falta que lo vuelvas a cargar.</span>`;
 }
 const PV_CAT_IDS = ['estudios','alquiler','servicios','supermercado','juntadas','gimnasio','deportes','nafta','seguroAuto','patente','mantenimientoAuto','auto','suscripciones','cnc','prepaga','farmacia','viajes','colegio','ninera','actividades','casaFam'];
 const PV_EXTRA_TOGGLE = ['deportes','seguroAuto','patente','mantenimientoAuto','auto','prepaga','farmacia','viajes','colegio','ninera','actividades','casaFam'];
@@ -1793,6 +1879,7 @@ function renderGastos() {
   }
 
   renderAlertasBanner();
+  renderFuturoNote();
 
   const tbody = $('tbody-gastos');
   if (!list.length) {
@@ -1803,7 +1890,7 @@ function renderGastos() {
     <tr>
       <td data-label="Fecha" style="color:var(--muted)">${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</td>
       <td data-label="Categoría"><span class="cat-chip">${catLabel(g.cat)}</span></td>
-      <td data-label="Monto" style="font-weight:600">${fmtARS(g.monto)}</td>
+      <td data-label="Monto" style="font-weight:600">${fmtARS(g.monto)}${g.grupo ? `<span class="cuota-chip" title="Pagaste ${fmtARS(g.montoTotal)} el ${new Date(g.fechaPago + 'T00:00:00').toLocaleDateString('es-AR')} por ${g.cuotas} meses">${g.cuota} de ${g.cuotas}</span>` : ''}</td>
       <td data-label="Nota" style="color:var(--muted)">${g.nota || '—'}</td>
       <td><button class="del-gasto-btn" onclick="removeGasto(${g.id})" title="Eliminar">✕</button></td>
     </tr>`).join('');
