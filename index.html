@@ -588,6 +588,60 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
   .proy-table-wrap td:nth-child(2) { text-align: left !important; }
   .gastos-table-wrap tbody td[data-label]::before, .proy-table-wrap tbody td[data-label]::before { content: none; }
 }
+
+/* ── ALERTAS DE CATEGORÍA ─────────────────────────────────────────────── */
+.alerta-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(26,26,24,.45); backdrop-filter: blur(2px);
+}
+.alerta-backdrop.open { display: block; }
+html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
+
+.alerta-modal {
+  display: none; position: fixed; z-index: 201;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(400px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-float);
+  padding: 24px 20px 16px; text-align: center;
+}
+.alerta-modal.open { display: block; animation: alertaIn .18s ease-out; }
+@keyframes alertaIn {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.alerta-ic { font-size: 2rem; line-height: 1; margin-bottom: 12px; }
+.alerta-titulo { font-size: 1.05rem; font-weight: 700; line-height: 1.3; margin-bottom: 3px; }
+.alerta-cat { font-size: .8rem; color: var(--muted); margin-bottom: 16px; }
+.alerta-bar { height: 8px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-bottom: 9px; }
+.alerta-fill { height: 100%; border-radius: 99px; }
+.alerta-nums { font-size: .92rem; font-weight: 600; margin-bottom: 9px; }
+.alerta-msg { font-size: .82rem; color: var(--muted); line-height: 1.5; margin-bottom: 18px; }
+.alerta-acciones { display: flex; flex-direction: column; gap: 8px; }
+.alerta-btn-ok {
+  width: 100%; padding: 11px; border: none; border-radius: var(--radius-md);
+  background: var(--accent); color: #fff; font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer;
+}
+.alerta-btn-ok:hover { background: var(--accent-dark); }
+.alerta-btn-mute {
+  width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: transparent; color: var(--muted); font: inherit; font-size: .78rem; cursor: pointer;
+}
+.alerta-btn-mute:hover { background: var(--surface-2); color: var(--text); }
+
+.alertas-banner { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.ab-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 12px; border-radius: var(--radius-md);
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: .8rem; line-height: 1.35;
+}
+.ab-row.nivel-exceso { background: var(--red-soft); border-color: transparent; }
+.ab-row.nivel-aviso  { background: var(--gold-soft); border-color: transparent; }
+.ab-ic { font-size: .95rem; flex-shrink: 0; }
+.ab-txt { flex: 1; }
+.ab-txt b { font-weight: 650; }
+.ab-pct { font-weight: 700; font-size: .8rem; flex-shrink: 0; }
 </style>
 <script>
 // Aplica el tema guardado ANTES de pintar, para evitar el flash de tema incorrecto.
@@ -624,6 +678,21 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
 </header>
 
 <div class="sheet-backdrop" id="sheet-backdrop" onclick="toggleSidebar()"></div>
+
+<!-- ALERTA DE CATEGORÍA -->
+<div class="alerta-backdrop" id="alerta-backdrop" onclick="cerrarAlerta()"></div>
+<div class="alerta-modal" id="alerta-modal" role="alertdialog" aria-modal="true" aria-labelledby="alerta-titulo">
+  <div class="alerta-ic" id="alerta-ic">⚠️</div>
+  <div class="alerta-titulo" id="alerta-titulo"></div>
+  <div class="alerta-cat" id="alerta-cat"></div>
+  <div class="alerta-bar"><div class="alerta-fill" id="alerta-fill"></div></div>
+  <div class="alerta-nums" id="alerta-nums"></div>
+  <div class="alerta-msg" id="alerta-msg"></div>
+  <div class="alerta-acciones">
+    <button class="alerta-btn-ok" onclick="cerrarAlerta()">Entendido</button>
+    <button class="alerta-btn-mute" onclick="silenciarAlertaActual()">No avisarme más de este rubro este mes</button>
+  </div>
+</div>
 
 <div class="shell">
   <aside id="aside">
@@ -913,6 +982,21 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
         <div class="field-row">
           <input type="range" id="anosProy" min="1" max="30" value="10" step="1">
           <span class="val" id="v-anosProy"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="param-group">
+      <div class="grp-label">Alertas de gasto</div>
+      <div class="toggle-field">
+        <label>Avisarme si me paso de un rubro</label>
+        <label class="switch"><input type="checkbox" id="tog-alertas" checked><span class="slider-sw"></span></label>
+      </div>
+      <div class="field" id="row-umbralAlerta">
+        <label>Avisar al llegar al</label>
+        <div class="field-row">
+          <input type="range" id="umbralAlerta" min="0.5" max="1" value="0.8" step="0.05">
+          <span class="val" id="v-umbralAlerta"></span>
         </div>
       </div>
     </div>
@@ -1259,6 +1343,8 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
             </div>
             <button class="btn-close-month" onclick="closeMonth()">📌 Cerrar mes</button>
           </div>
+
+          <div class="alertas-banner" id="alertas-banner" style="display:none"></div>
 
           <div class="gasto-form">
             <div class="gasto-form-row">
@@ -1634,6 +1720,7 @@ function addGasto() {
   $('gasto-monto').value = '';
   $('gasto-nota').value = '';
   renderGastos();
+  chequearAlertaCat(cat);
 }
 function removeGasto(id) {
   const all = loadGastosAll();
@@ -1705,6 +1792,8 @@ function renderGastos() {
     }).join('');
   }
 
+  renderAlertasBanner();
+
   const tbody = $('tbody-gastos');
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="gastos-empty">Todavía no cargaste gastos este mes. Usá el formulario de arriba para empezar.</td></tr>`;
@@ -1719,6 +1808,179 @@ function renderGastos() {
       <td><button class="del-gasto-btn" onclick="removeGasto(${g.id})" title="Eliminar">✕</button></td>
     </tr>`).join('');
 }
+
+// ── ALERTAS DE CATEGORÍA ──────────────────────────────────────────────────
+// Avisan cuando el gasto real de un rubro llega al umbral configurado (aviso)
+// o se pasa del presupuesto (exceso). El pop-up salta al cargar un gasto; el
+// banner de la pestaña "Gastos del mes" muestra la foto permanente.
+const LS_ALERTAS_CFG = 'presupuesto_alertas_cfg_v1';
+const LS_ALERTAS_EST = 'presupuesto_alertas_estado_v1';
+const NIVEL_AVISO = 1, NIVEL_EXCESO = 2;
+
+function loadAlertasCfg() {
+  try {
+    const r = JSON.parse(localStorage.getItem(LS_ALERTAS_CFG) || '{}');
+    const u = parseFloat(r.umbral);
+    return { activas: r.activas !== false, umbral: (u > 0 && u <= 1) ? u : 0.8 };
+  } catch (e) { return { activas: true, umbral: 0.8 }; }
+}
+function saveAlertasCfg(cfg) {
+  try { localStorage.setItem(LS_ALERTAS_CFG, JSON.stringify(cfg)); } catch (e) {}
+}
+function loadAlertasEstado() {
+  try { return JSON.parse(localStorage.getItem(LS_ALERTAS_EST) || '{}'); } catch (e) { return {}; }
+}
+function saveAlertasEstado(all) {
+  try { localStorage.setItem(LS_ALERTAS_EST, JSON.stringify(all)); } catch (e) {}
+}
+// Estado por rubro y por mes: hasta qué nivel ya se avisó, y si el usuario lo silenció.
+function getAlertaEstado(cat) {
+  const all = loadAlertasEstado();
+  const m = all[monthKey()] || {};
+  return Object.assign({ nivel: 0, mute: false }, m[cat]);
+}
+function setAlertaEstado(cat, patch) {
+  const key = monthKey();
+  const all = loadAlertasEstado();
+  if (!all[key]) all[key] = {};
+  all[key][cat] = Object.assign({ nivel: 0, mute: false }, all[key][cat], patch);
+  saveAlertasEstado(all);
+}
+
+function nivelAlerta(pct, umbral) {
+  if (pct >= 1) return NIVEL_EXCESO;
+  if (pct >= umbral) return NIVEL_AVISO;
+  return 0;
+}
+function gastosPorCatMes() {
+  const list = loadGastosAll()[monthKey()] || [];
+  const by = {};
+  list.forEach(g => { by[g.cat] = (by[g.cat] || 0) + g.monto; });
+  return by;
+}
+// Rubros con presupuesto asignado que hoy están en aviso o en exceso.
+function calcularAlertas() {
+  const cfg = loadAlertasCfg();
+  const byCat = gastosPorCatMes();
+  const out = [];
+  PV_CAT_IDS.forEach(id => {
+    const presu = getPresupuestoCat(id);
+    if (!(presu > 0)) return;
+    const real = byCat[id] || 0;
+    const pct = real / presu;
+    out.push({ id, presu, real, pct, nivel: nivelAlerta(pct, cfg.umbral) });
+  });
+  return out;
+}
+
+// Salta al cargar un gasto, solo si ese rubro cruzó un nivel nuevo.
+function chequearAlertaCat(cat) {
+  const cfg = loadAlertasCfg();
+  if (!cfg.activas) return;
+  if (!PV_CAT_IDS.includes(cat)) return;          // "Otro" no tiene presupuesto propio
+  const presu = getPresupuestoCat(cat);
+  if (!(presu > 0)) return;                       // sin presupuesto no hay umbral que cruzar
+  const real = gastosPorCatMes()[cat] || 0;
+  const pct = real / presu;
+  const nivel = nivelAlerta(pct, cfg.umbral);
+  const est = getAlertaEstado(cat);
+  if (nivel === 0 || est.mute || nivel <= est.nivel) return;
+  setAlertaEstado(cat, { nivel });
+  mostrarAlerta({ id: cat, presu, real, pct, nivel });
+}
+
+let alertaCatActual = null;
+function mostrarAlerta(r) {
+  alertaCatActual = r.id;
+  const exceso = r.nivel >= NIVEL_EXCESO;
+  const color = exceso ? 'var(--red)' : 'var(--gold)';
+  $('alerta-ic').textContent = exceso ? '🚨' : '⚠️';
+  $('alerta-titulo').textContent = exceso
+    ? 'Te pasaste del presupuesto'
+    : `Ya usaste el ${fmtPctInt(r.pct)} de este rubro`;
+  $('alerta-cat').textContent = catLabel(r.id);
+  $('alerta-fill').style.width = Math.min(r.pct, 1) * 100 + '%';
+  $('alerta-fill').style.background = color;
+  $('alerta-nums').innerHTML = `<span style="color:${exceso ? 'var(--red-text)' : 'var(--gold-text)'}">${fmtARS(r.real)}</span> <span style="color:var(--muted);font-weight:500">de</span> ${fmtARS(r.presu)}`;
+  $('alerta-msg').textContent = exceso
+    ? `Te pasaste por ${fmtARS(r.real - r.presu)} en lo que va del mes. Si podés, frená los gastos de este rubro hasta que arranque el mes que viene.`
+    : `Te quedan ${fmtARS(r.presu - r.real)} para el resto del mes en este rubro.`;
+  $('alerta-backdrop').classList.add('open');
+  $('alerta-modal').classList.add('open');
+}
+function cerrarAlerta() {
+  $('alerta-backdrop').classList.remove('open');
+  $('alerta-modal').classList.remove('open');
+  alertaCatActual = null;
+}
+function silenciarAlertaActual() {
+  if (alertaCatActual) setAlertaEstado(alertaCatActual, { mute: true, nivel: NIVEL_EXCESO });
+  cerrarAlerta();
+  renderAlertasBanner();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('alerta-modal').classList.contains('open')) cerrarAlerta();
+});
+
+function renderAlertasBanner() {
+  const el = $('alertas-banner');
+  if (!el) return;
+  const cfg = loadAlertasCfg();
+  const rows = calcularAlertas();
+
+  // Si un rubro bajó de nivel (borraste un gasto o subiste el presupuesto),
+  // destrabamos el aviso para que pueda volver a saltar si lo cruzás de nuevo.
+  const key = monthKey();
+  const all = loadAlertasEstado();
+  let dirty = false;
+  rows.forEach(r => {
+    const est = all[key] && all[key][r.id];
+    if (!est) return;
+    if (r.nivel === 0 && (est.nivel > 0 || est.mute)) { all[key][r.id] = { nivel: 0, mute: false }; dirty = true; }
+    else if (est.nivel > r.nivel) { est.nivel = r.nivel; dirty = true; }
+  });
+  if (dirty) saveAlertasEstado(all);
+
+  const visibles = cfg.activas
+    ? rows.filter(r => r.nivel > 0 && !getAlertaEstado(r.id).mute).sort((a, b) => b.pct - a.pct)
+    : [];
+  if (!visibles.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+  el.style.display = '';
+  el.innerHTML = visibles.map(r => {
+    const exceso = r.nivel >= NIVEL_EXCESO;
+    const txt = exceso
+      ? `<b>${catLabel(r.id)}</b> — te pasaste por ${fmtARS(r.real - r.presu)} (${fmtARS(r.real)} de ${fmtARS(r.presu)})`
+      : `<b>${catLabel(r.id)}</b> — te quedan ${fmtARS(r.presu - r.real)} (${fmtARS(r.real)} de ${fmtARS(r.presu)})`;
+    return `
+      <div class="ab-row ${exceso ? 'nivel-exceso' : 'nivel-aviso'}">
+        <span class="ab-ic">${exceso ? '🚨' : '⚠️'}</span>
+        <span class="ab-txt">${txt}</span>
+        <span class="ab-pct" style="color:${exceso ? 'var(--red-text)' : 'var(--gold-text)'}">${fmtPctInt(r.pct)}</span>
+      </div>`;
+  }).join('');
+}
+
+function initAlertasUI() {
+  const cfg = loadAlertasCfg();
+  const tg = $('tog-alertas'), sl = $('umbralAlerta'), vl = $('v-umbralAlerta'), row = $('row-umbralAlerta');
+  if (!tg || !sl) return;
+  tg.checked = cfg.activas;
+  sl.value = cfg.umbral;
+  if (vl) vl.textContent = fmtPctInt(cfg.umbral);
+  if (row) row.style.display = cfg.activas ? '' : 'none';
+  tg.addEventListener('change', () => {
+    const c = loadAlertasCfg(); c.activas = tg.checked; saveAlertasCfg(c);
+    if (row) row.style.display = tg.checked ? '' : 'none';
+    renderAlertasBanner();
+  });
+  sl.addEventListener('input', () => {
+    const c = loadAlertasCfg(); c.umbral = parseFloat(sl.value); saveAlertasCfg(c);
+    if (vl) vl.textContent = fmtPctInt(c.umbral);
+    renderAlertasBanner();
+  });
+}
+initAlertasUI();
 
 // ── HISTÓRICO / SNAPSHOTS MENSUALES ─────────────────────────────────────
 const LS_SNAPSHOTS = 'presupuesto_snapshots_v1';
@@ -1845,7 +2107,7 @@ function syncAhorroARetiro() {
 }
 
 // ── BACKUP: EXPORTAR / IMPORTAR ─────────────────────────────────────────
-const BACKUP_KEYS = [LS_PARAMS, LS_GASTOS, LS_SNAPSHOTS, LS_TC];
+const BACKUP_KEYS = [LS_PARAMS, LS_GASTOS, LS_SNAPSHOTS, LS_TC, LS_ALERTAS_CFG, LS_ALERTAS_EST];
 function exportBackup() {
   const data = { exportedAt: new Date().toISOString(), app: 'presupuesto_personal', data: {} };
   BACKUP_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) data.data[k] = v; });
