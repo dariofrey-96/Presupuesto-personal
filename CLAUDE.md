@@ -83,13 +83,25 @@ Sección `── GASTOS FIJOS / RECURRENTES ──`, más `#fijos-card` y `#sug-
 - La tarjeta se colapsa a una línea cuando ya está todo cargado.
 - **Se agregó una cola de alertas** (`alertaCola`) porque "Cargar todos" puede disparar varias a la vez y antes se pisaban entre sí.
 
+### Vista "Esta semana" / pantalla de inicio (implementado 2026-08-13)
+
+Pestaña nueva `inicio`, **primera y por defecto** (`currentTab = 'inicio'`, `view-presupuesto` arranca oculto). Sección `── INICIO / ESTA SEMANA ──`, `renderInicio()`. La semana va **de lunes a domingo** (`lunesDeLaSemana()`); como puede cruzar dos meses, `todosLosGastos()` aplana todos los buckets.
+
+Cuatro bloques: gastado de la semana con comparación contra la semana anterior *a la misma altura* (`totalHastaDia`, si no compararía media semana contra una entera), barritas por día con hoy resaltado, **ritmo del mes** (`ritmoDelMes()`: barra de % de presupuesto usado con una marca en el % de mes transcurrido, más "te quedan $X para Y días = $Z por día"), y "Te está esperando" que resume fijos pendientes + alertas + sugerencias con botones que llevan a Gastos.
+
+- `renderInicio()` se llama desde `setTab('inicio')` y en el INIT. **A propósito NO se llama desde `recalc()`**: recalc corre en cada movimiento de slider y renderInicio lee varias claves de localStorage.
+- La barra inferior pasó de 5 a 6 ítems; se acortaron labels ("Presup.", "Histór.", "Proyec.") y se bajó el padding. Verificado: entran a 375px sin cortarse.
+- Estados vacíos cubiertos: sin gastos, y sin presupuesto definido (ahí no da veredicto, invita a definirlo).
+
+**Nota para verificar en el navegador**: si el panel de preview no está compositando, las transiciones CSS quedan congeladas y `getComputedStyle` del `body` devuelve el color viejo al cambiar de tema. No es un bug — desactivar `transition` para medir.
+
 ## Ideas pendientes
 
-Confirmadas por el usuario (2026-08-07), en orden de prioridad. Las #1 y #2 ya están hechas:
+Confirmadas por el usuario (2026-08-07). Las tres primeras ya están hechas:
 
 1. ~~**Alertas de categoría**~~ — ✅ hecho el 2026-08-13 (ver sección arriba).
 2. ~~**Detección de gastos recurrentes**~~ — ✅ hecho el 2026-08-13 (ver sección arriba).
-3. **Vista "esta semana"** como pantalla de inicio: un resumen rápido al abrir la app en vez de una tabla vacía, para dar un motivo de entrar seguido.
+3. ~~**Vista "esta semana"**~~ — ✅ hecho el 2026-08-13 (ver sección arriba).
 
 Inspiradas en plata.wtf, más a futuro:
 
