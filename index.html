@@ -656,6 +656,66 @@ html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
   font-size: .78rem; color: var(--muted); line-height: 1.45;
 }
 .futuro-note b { color: var(--text); font-weight: 650; }
+
+/* ── GASTOS FIJOS / RECURRENTES ───────────────────────────────────────── */
+.fijos-card, .sug-card {
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--surface); padding: 14px; margin-bottom: 14px;
+}
+.fc-hdr { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.fc-title { font-size: .8rem; font-weight: 650; }
+.fc-count { font-size: .66rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; white-space: nowrap; }
+.fc-ver {
+  border: none; background: transparent; color: var(--accent-text); font: inherit;
+  font-size: .74rem; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap;
+}
+.fc-ver:hover { text-decoration: underline; }
+.fc-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 0; border-top: 1px solid var(--hairline); font-size: .8rem;
+}
+.fc-dot { color: var(--gold); font-size: 1.1rem; line-height: 1; }
+.fc-check { color: var(--green-text); font-weight: 700; }
+.fc-name { flex: 1 1 140px; min-width: 0; line-height: 1.35; }
+.fc-row.fc-done .fc-name { color: var(--muted); }
+.fc-monto { color: var(--muted); font-weight: 600; font-size: .76rem; }
+.fc-input {
+  width: 104px; padding: 6px 8px; font: inherit; font-size: .76rem; text-align: right;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text);
+}
+.fc-input:focus { border-color: var(--accent); background: var(--surface); outline: none; }
+.fc-btn {
+  padding: 6px 13px; border: none; border-radius: var(--radius-sm);
+  background: var(--accent); color: #fff; font: inherit; font-size: .74rem; font-weight: 600; cursor: pointer;
+}
+.fc-btn:hover { background: var(--accent-dark); }
+.fc-x {
+  border: none; background: transparent; color: var(--text-3);
+  font-size: .8rem; cursor: pointer; padding: 2px 4px; line-height: 1;
+}
+.fc-x:hover { color: var(--red-text); }
+.fc-btn-all {
+  width: 100%; margin-top: 10px; padding: 9px; border: 1px solid var(--accent);
+  border-radius: var(--radius-md); background: transparent; color: var(--accent-text);
+  font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer;
+}
+.fc-btn-all:hover { background: var(--accent-soft); }
+
+.sug-card { background: var(--accent-soft); border-color: transparent; }
+.sug-row { display: flex; align-items: flex-start; gap: 9px; flex-wrap: wrap; }
+.sug-row + .sug-row { border-top: 1px solid var(--hairline); margin-top: 10px; padding-top: 12px; }
+.sug-ic { font-size: .95rem; line-height: 1.5; }
+.sug-txt { flex: 1 1 190px; font-size: .78rem; line-height: 1.5; }
+.sug-acciones { display: flex; gap: 6px; margin-left: auto; }
+.sug-si, .sug-no {
+  padding: 6px 13px; border-radius: var(--radius-sm); font: inherit;
+  font-size: .74rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.sug-si { border: none; background: var(--accent); color: #fff; }
+.sug-si:hover { background: var(--accent-dark); }
+.sug-no { border: 1px solid var(--border); background: var(--surface); color: var(--muted); }
+.sug-no:hover { color: var(--text); }
 </style>
 <script>
 // Aplica el tema guardado ANTES de pintar, para evitar el flash de tema incorrecto.
@@ -1360,6 +1420,9 @@ html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
 
           <div class="alertas-banner" id="alertas-banner" style="display:none"></div>
 
+          <div class="fijos-card" id="fijos-card" style="display:none"></div>
+          <div class="sug-card" id="sug-card" style="display:none"></div>
+
           <div class="gasto-form">
             <div class="gasto-form-row">
               <div class="field">
@@ -1880,6 +1943,8 @@ function renderGastos() {
 
   renderAlertasBanner();
   renderFuturoNote();
+  renderFijos();
+  renderSugerenciasFijos();
 
   const tbody = $('tbody-gastos');
   if (!list.length) {
@@ -1891,7 +1956,7 @@ function renderGastos() {
       <td data-label="Fecha" style="color:var(--muted)">${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}</td>
       <td data-label="Categoría"><span class="cat-chip">${catLabel(g.cat)}</span></td>
       <td data-label="Monto" style="font-weight:600">${fmtARS(g.monto)}${g.grupo ? `<span class="cuota-chip" title="Pagaste ${fmtARS(g.montoTotal)} el ${new Date(g.fechaPago + 'T00:00:00').toLocaleDateString('es-AR')} por ${g.cuotas} meses">${g.cuota} de ${g.cuotas}</span>` : ''}</td>
-      <td data-label="Nota" style="color:var(--muted)">${g.nota || '—'}</td>
+      <td data-label="Nota" style="color:var(--muted)">${esc(g.nota) || '—'}</td>
       <td><button class="del-gasto-btn" onclick="removeGasto(${g.id})" title="Eliminar">✕</button></td>
     </tr>`).join('');
 }
@@ -1977,21 +2042,28 @@ function chequearAlertaCat(cat) {
 }
 
 let alertaCatActual = null;
+let alertaCola = [];
 function mostrarAlerta(r) {
+  // Si ya hay una alerta en pantalla (ej. cargaste varios gastos fijos de una
+  // sola vez), la nueva espera su turno en vez de pisar a la anterior.
+  if ($('alerta-modal').classList.contains('open')) { alertaCola.push(r); return; }
   alertaCatActual = r.id;
   const exceso = r.nivel >= NIVEL_EXCESO;
   const color = exceso ? 'var(--red)' : 'var(--gold)';
   $('alerta-ic').textContent = exceso ? '🚨' : '⚠️';
-  $('alerta-titulo').textContent = exceso
-    ? 'Te pasaste del presupuesto'
-    : `Ya usaste el ${fmtPctInt(r.pct)} de este rubro`;
+  const justo = exceso && r.real <= r.presu;   // quedaste clavado en el 100%
+  $('alerta-titulo').textContent = !exceso
+    ? `Ya usaste el ${fmtPctInt(r.pct)} de este rubro`
+    : justo ? 'Usaste todo el presupuesto' : 'Te pasaste del presupuesto';
   $('alerta-cat').textContent = catLabel(r.id);
   $('alerta-fill').style.width = Math.min(r.pct, 1) * 100 + '%';
   $('alerta-fill').style.background = color;
   $('alerta-nums').innerHTML = `<span style="color:${exceso ? 'var(--red-text)' : 'var(--gold-text)'}">${fmtARS(r.real)}</span> <span style="color:var(--muted);font-weight:500">de</span> ${fmtARS(r.presu)}`;
-  $('alerta-msg').textContent = exceso
-    ? `Te pasaste por ${fmtARS(r.real - r.presu)} en lo que va del mes. Si podés, frená los gastos de este rubro hasta que arranque el mes que viene.`
-    : `Te quedan ${fmtARS(r.presu - r.real)} para el resto del mes en este rubro.`;
+  $('alerta-msg').textContent = !exceso
+    ? `Te quedan ${fmtARS(r.presu - r.real)} para el resto del mes en este rubro.`
+    : justo
+      ? 'Llegaste justo al límite. Todo lo que gastes de acá en adelante en este rubro ya te pasa del presupuesto.'
+      : `Te pasaste por ${fmtARS(r.real - r.presu)} en lo que va del mes. Si podés, frená los gastos de este rubro hasta que arranque el mes que viene.`;
   $('alerta-backdrop').classList.add('open');
   $('alerta-modal').classList.add('open');
 }
@@ -1999,6 +2071,10 @@ function cerrarAlerta() {
   $('alerta-backdrop').classList.remove('open');
   $('alerta-modal').classList.remove('open');
   alertaCatActual = null;
+  if (alertaCola.length) {
+    const siguiente = alertaCola.shift();
+    setTimeout(() => mostrarAlerta(siguiente), 180);
+  }
 }
 function silenciarAlertaActual() {
   if (alertaCatActual) setAlertaEstado(alertaCatActual, { mute: true, nivel: NIVEL_EXCESO });
@@ -2036,9 +2112,10 @@ function renderAlertasBanner() {
   el.style.display = '';
   el.innerHTML = visibles.map(r => {
     const exceso = r.nivel >= NIVEL_EXCESO;
-    const txt = exceso
-      ? `<b>${catLabel(r.id)}</b> — te pasaste por ${fmtARS(r.real - r.presu)} (${fmtARS(r.real)} de ${fmtARS(r.presu)})`
-      : `<b>${catLabel(r.id)}</b> — te quedan ${fmtARS(r.presu - r.real)} (${fmtARS(r.real)} de ${fmtARS(r.presu)})`;
+    const detalle = !exceso
+      ? `te quedan ${fmtARS(r.presu - r.real)}`
+      : r.real <= r.presu ? 'usaste todo el presupuesto' : `te pasaste por ${fmtARS(r.real - r.presu)}`;
+    const txt = `<b>${catLabel(r.id)}</b> — ${detalle} (${fmtARS(r.real)} de ${fmtARS(r.presu)})`;
     return `
       <div class="ab-row ${exceso ? 'nivel-exceso' : 'nivel-aviso'}">
         <span class="ab-ic">${exceso ? '🚨' : '⚠️'}</span>
@@ -2068,6 +2145,206 @@ function initAlertasUI() {
   });
 }
 initAlertasUI();
+
+// ── GASTOS FIJOS / RECURRENTES ────────────────────────────────────────────
+// Si un gasto se repite mes a mes, la app lo sugiere como "fijo". Nunca lo
+// carga sola: cada mes te lo ofrece con el monto del mes anterior editable
+// (con la inflación de acá, el importe cambia seguido).
+const LS_RECURRENTES = 'presupuesto_recurrentes_v1';
+const MESES_MIRADOS = 3;        // ventana hacia atrás para buscar repeticiones
+const MESES_PARA_SUGERIR = 2;   // en cuántos de esos meses tiene que aparecer
+
+function loadRecurrentes() {
+  try {
+    const r = JSON.parse(localStorage.getItem(LS_RECURRENTES) || '{}');
+    return { fijos: r.fijos || {}, descartados: r.descartados || [] };
+  } catch (e) { return { fijos: {}, descartados: [] }; }
+}
+function saveRecurrentes(r) {
+  try { localStorage.setItem(LS_RECURRENTES, JSON.stringify(r)); } catch (e) {}
+}
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// "Cuota   Mensual" y "cuota mensual" son el mismo gasto.
+function normNota(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+function claveGasto(cat, nota) { return cat + '|' + normNota(nota); }
+function etiquetaFijo(cat, nota) { return nota ? `${catLabel(cat)} · ${nota}` : catLabel(cat); }
+function mesesRecientes(n) {
+  const hoy = new Date(), out = [];
+  for (let i = 0; i < n; i++) out.push(monthKey(new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)));
+  return out;
+}
+
+function detectarCandidatosFijos() {
+  const rec = loadRecurrentes();
+  const all = loadGastosAll();
+  const porClave = {};
+  mesesRecientes(MESES_MIRADOS).forEach(m => {
+    (all[m] || []).forEach(x => {
+      if (x.grupo) return;   // los pagos repartidos ya se cargan solos en cada mes
+      const k = claveGasto(x.cat, x.nota);
+      if (!porClave[k]) porClave[k] = { clave: k, cat: x.cat, nota: x.nota, porMes: {} };
+      (porClave[k].porMes[m] = porClave[k].porMes[m] || []).push(x);
+    });
+  });
+  return Object.values(porClave)
+    .filter(c => !rec.fijos[c.clave] && !rec.descartados.includes(c.clave))
+    .filter(c => {
+      const ms = Object.keys(c.porMes);
+      // Tiene que repetirse en varios meses y una sola vez por mes, así no
+      // sugerimos "supermercado" que cargás cinco veces al mes.
+      return ms.length >= MESES_PARA_SUGERIR && ms.every(m => c.porMes[m].length === 1);
+    })
+    .map(c => {
+      const ms = Object.keys(c.porMes).sort();
+      const ult = c.porMes[ms[ms.length - 1]][0];
+      return { clave: c.clave, cat: c.cat, nota: c.nota, monto: ult.monto, dia: parseInt(ult.fecha.slice(8, 10), 10) || 1, meses: ms.length };
+    })
+    .sort((a, b) => b.meses - a.meses || b.monto - a.monto);
+}
+
+function estadoFijos() {
+  const rec = loadRecurrentes();
+  const yaEsteMes = new Set((loadGastosAll()[monthKey()] || []).map(x => claveGasto(x.cat, x.nota)));
+  return Object.entries(rec.fijos)
+    .map(([clave, f]) => ({ clave, cat: f.cat, nota: f.nota, monto: f.monto, dia: f.dia, cargado: yaEsteMes.has(clave) }))
+    .sort((a, b) => (a.cargado - b.cargado) || etiquetaFijo(a.cat, a.nota).localeCompare(etiquetaFijo(b.cat, b.nota)));
+}
+
+let _seqGasto = 0;
+function agregarFijoAlMes(f, monto) {
+  const key = monthKey();
+  const [y, m] = key.split('-').map(Number);
+  const ultimoDia = new Date(y, m, 0).getDate();
+  const dia = Math.min(Math.max(parseInt(f.dia, 10) || 1, 1), ultimoDia);
+  const all = loadGastosAll();
+  if (!all[key]) all[key] = [];
+  all[key].push({ id: Date.now() + (_seqGasto++), fecha: `${key}-${String(dia).padStart(2, '0')}`, cat: f.cat, monto, nota: f.nota });
+  all[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  saveGastosAll(all);
+  const rec = loadRecurrentes();
+  if (rec.fijos[f.clave]) { rec.fijos[f.clave].monto = monto; saveRecurrentes(rec); }  // el monto de este mes manda para el que viene
+}
+
+let fijosRender = [], candidatosRender = [], fijosVerTodo = false;
+
+function montoDeFila(i, porDefecto) {
+  const input = $('fijo-monto-' + i);
+  return parseFloat(input ? input.value : porDefecto);
+}
+function cargarFijo(i) {
+  const f = fijosRender[i];
+  if (!f || f.cargado) return;
+  const monto = montoDeFila(i, f.monto);
+  if (!monto || monto <= 0) { alert('Cargá un monto válido para este gasto fijo.'); return; }
+  agregarFijoAlMes(f, monto);
+  renderGastos();
+  chequearAlertaCat(f.cat);
+}
+function cargarTodosLosFijos() {
+  const cats = [];
+  fijosRender.forEach((f, i) => {
+    if (f.cargado) return;
+    const monto = montoDeFila(i, f.monto);
+    if (!monto || monto <= 0) return;
+    agregarFijoAlMes(f, monto);
+    if (!cats.includes(f.cat)) cats.push(f.cat);
+  });
+  renderGastos();
+  cats.forEach(chequearAlertaCat);
+}
+function marcarFijo(i) {
+  const c = candidatosRender[i];
+  if (!c) return;
+  const rec = loadRecurrentes();
+  rec.fijos[c.clave] = { cat: c.cat, nota: c.nota, monto: c.monto, dia: c.dia };
+  saveRecurrentes(rec);
+  renderGastos();
+}
+function descartarFijo(i) {
+  const c = candidatosRender[i];
+  if (!c) return;
+  const rec = loadRecurrentes();
+  if (!rec.descartados.includes(c.clave)) rec.descartados.push(c.clave);
+  saveRecurrentes(rec);
+  renderGastos();
+}
+function quitarFijo(i) {
+  const f = fijosRender[i];
+  if (!f) return;
+  if (!confirm(`"${etiquetaFijo(f.cat, f.nota)}" va a dejar de figurar como gasto fijo.\n\nLos gastos que ya cargaste quedan como están. ¿Seguir?`)) return;
+  const rec = loadRecurrentes();
+  delete rec.fijos[f.clave];
+  if (!rec.descartados.includes(f.clave)) rec.descartados.push(f.clave);  // no volver a sugerirlo
+  saveRecurrentes(rec);
+  renderGastos();
+}
+function toggleVerFijos(v) { fijosVerTodo = v; renderFijos(); }
+
+function renderFijos() {
+  const el = $('fijos-card');
+  if (!el) return;
+  fijosRender = estadoFijos();
+  if (!fijosRender.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+
+  const pendientes = fijosRender.filter(f => !f.cargado).length;
+  const total = fijosRender.length;
+  const plural = total > 1;
+
+  // Si ya está todo cargado, se encoge a una línea para no ocupar pantalla al pedo.
+  if (!pendientes && !fijosVerTodo) {
+    el.innerHTML = `
+      <div class="fc-hdr">
+        <span class="fc-title" style="color:var(--green-text)">✓ ${plural ? `Tus ${total} gastos fijos ya están cargados` : 'Tu gasto fijo ya está cargado'} este mes</span>
+        <button class="fc-ver" onclick="toggleVerFijos(true)">Ver</button>
+      </div>`;
+    return;
+  }
+
+  const filas = fijosRender.map((f, i) => f.cargado
+    ? `<div class="fc-row fc-done">
+         <span class="fc-check">✓</span>
+         <span class="fc-name">${esc(etiquetaFijo(f.cat, f.nota))}</span>
+         <span class="fc-monto">${fmtARS(f.monto)}</span>
+         <button class="fc-x" onclick="quitarFijo(${i})" title="Que deje de ser un gasto fijo">✕</button>
+       </div>`
+    : `<div class="fc-row">
+         <span class="fc-dot">•</span>
+         <span class="fc-name">${esc(etiquetaFijo(f.cat, f.nota))}</span>
+         <input class="fc-input" id="fijo-monto-${i}" type="number" min="0" step="1000" value="${f.monto}" aria-label="Monto de ${esc(etiquetaFijo(f.cat, f.nota))}">
+         <button class="fc-btn" onclick="cargarFijo(${i})">Cargar</button>
+         <button class="fc-x" onclick="quitarFijo(${i})" title="Que deje de ser un gasto fijo">✕</button>
+       </div>`).join('');
+
+  el.innerHTML = `
+    <div class="fc-hdr">
+      <span class="fc-title">Gastos fijos de ${monthLabel(monthKey())}</span>
+      <span class="fc-count">${total - pendientes} de ${total} cargados</span>
+    </div>
+    ${filas}
+    ${pendientes > 1 ? `<button class="fc-btn-all" onclick="cargarTodosLosFijos()">Cargar los ${pendientes} que faltan</button>` : ''}
+    ${!pendientes ? `<button class="fc-ver" style="margin-top:10px" onclick="toggleVerFijos(false)">Ocultar</button>` : ''}`;
+}
+
+function renderSugerenciasFijos() {
+  const el = $('sug-card');
+  if (!el) return;
+  candidatosRender = detectarCandidatosFijos().slice(0, 3);
+  if (!candidatosRender.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = candidatosRender.map((c, i) => `
+    <div class="sug-row">
+      <span class="sug-ic">💡</span>
+      <span class="sug-txt"><b>${esc(etiquetaFijo(c.cat, c.nota))}</b> te aparece ${c.meses} meses seguidos, el último por ${fmtARS(c.monto)}. ¿Lo marcamos como gasto fijo para ofrecértelo todos los meses?</span>
+      <span class="sug-acciones">
+        <button class="sug-si" onclick="marcarFijo(${i})">Sí, es fijo</button>
+        <button class="sug-no" onclick="descartarFijo(${i})">No</button>
+      </span>
+    </div>`).join('');
+}
 
 // ── HISTÓRICO / SNAPSHOTS MENSUALES ─────────────────────────────────────
 const LS_SNAPSHOTS = 'presupuesto_snapshots_v1';
@@ -2194,7 +2471,7 @@ function syncAhorroARetiro() {
 }
 
 // ── BACKUP: EXPORTAR / IMPORTAR ─────────────────────────────────────────
-const BACKUP_KEYS = [LS_PARAMS, LS_GASTOS, LS_SNAPSHOTS, LS_TC, LS_ALERTAS_CFG, LS_ALERTAS_EST];
+const BACKUP_KEYS = [LS_PARAMS, LS_GASTOS, LS_SNAPSHOTS, LS_TC, LS_ALERTAS_CFG, LS_ALERTAS_EST, LS_RECURRENTES];
 function exportBackup() {
   const data = { exportedAt: new Date().toISOString(), app: 'presupuesto_personal', data: {} };
   BACKUP_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) data.data[k] = v; });

@@ -72,12 +72,23 @@ Nació de un problema real del usuario: paga el gimnasio o el mantenimiento del 
 - `removeGasto()` borra el grupo entero (con `confirm`), porque media parte de un pago repartido no significa nada.
 - `renderFuturoNote()` muestra en la pestaña de gastos cuánto ya está cubierto en meses siguientes, para que no parezca que la plata se perdió.
 
+### Gastos fijos / recurrentes (implementado 2026-08-13)
+
+Sección `── GASTOS FIJOS / RECURRENTES ──`, más `#fijos-card` y `#sug-card` en la pestaña de gastos. Clave nueva: `presupuesto_recurrentes_v1` = `{ fijos: {clave: {cat, nota, monto, dia}}, descartados: [claves] }`.
+
+- **Clave de identidad**: `cat + '|' + normNota(nota)`. `normNota()` baja a minúsculas, saca acentos y colapsa espacios, así "Cuota Mensual" y "cuota mensual" son el mismo gasto.
+- **Detección** (`detectarCandidatosFijos`): mira los últimos 3 meses; sugiere si aparece en ≥2 meses **y exactamente 1 vez por mes** — ese segundo filtro es lo que evita sugerir "supermercado", que se carga varias veces al mes. Excluye los que tienen `grupo` (pagos repartidos), porque esos ya se auto-cargan y sugerirlos los duplicaría.
+- **Nunca carga solo**: sugiere, y el usuario decide. Al marcarlo como fijo, cada mes aparece pendiente con el monto del mes anterior **editable** (requisito explícito por la inflación). Al cargarlo, el monto nuevo pisa al viejo para el mes siguiente.
+- Decir "No" o quitar un fijo mete la clave en `descartados` para no volver a preguntar.
+- La tarjeta se colapsa a una línea cuando ya está todo cargado.
+- **Se agregó una cola de alertas** (`alertaCola`) porque "Cargar todos" puede disparar varias a la vez y antes se pisaban entre sí.
+
 ## Ideas pendientes
 
-Confirmadas por el usuario (2026-08-07), en orden de prioridad. La #1 ya está hecha:
+Confirmadas por el usuario (2026-08-07), en orden de prioridad. Las #1 y #2 ya están hechas:
 
 1. ~~**Alertas de categoría**~~ — ✅ hecho el 2026-08-13 (ver sección arriba).
-2. **Detección de gastos recurrentes**: si el mismo gasto se repite ~2-3 meses seguidos, sugerir marcarlo como recurrente. Debe **preguntarle al usuario** (no automático) y permitir **editar el monto** después — con la inflación argentina el importe cambia seguido.
+2. ~~**Detección de gastos recurrentes**~~ — ✅ hecho el 2026-08-13 (ver sección arriba).
 3. **Vista "esta semana"** como pantalla de inicio: un resumen rápido al abrir la app en vez de una tabla vacía, para dar un motivo de entrar seguido.
 
 Inspiradas en plata.wtf, más a futuro:
