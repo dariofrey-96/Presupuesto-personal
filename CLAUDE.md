@@ -36,6 +36,8 @@ Todo en `localStorage` del navegador — **no hay servidor ni sincronización au
 - `presupuesto_snapshots_v1` — cierres de mes del histórico.
 - `presupuesto_tc_v1` — tipo de cambio ARS/USD cargado a mano.
 - `presupuesto_theme` — tema claro/oscuro.
+- `presupuesto_alertas_cfg_v1` — config de alertas de categoría (`{activas, umbral}`).
+- `presupuesto_alertas_estado_v1` — qué alertas ya se mostraron y cuáles se silenciaron, por mes y categoría (`{"2026-08": {"juntadas": {nivel, mute}}}`).
 - `planRetiro_params_v1` — **clave compartida con la app de Plan de Retiro.**
 
 ### Integración con Plan de Retiro (importante)
@@ -48,13 +50,23 @@ Hay 22 categorías fijas en el array `GASTO_CATS` (id + label). Los ids coincide
 
 ### Backup
 
-Export/import manual a archivo JSON (`exportBackup()` / `importBackup()`), que abarca las claves de params, gastos, snapshots y tipo de cambio. Es el único mecanismo de respaldo — si el usuario limpia el navegador sin exportar, pierde los datos.
+Export/import manual a archivo JSON (`exportBackup()` / `importBackup()`), que abarca las claves de params, gastos, snapshots, tipo de cambio y alertas (`BACKUP_KEYS`). Es el único mecanismo de respaldo — si el usuario limpia el navegador sin exportar, pierde los datos.
+
+### Alertas de categoría (implementado 2026-08-13)
+
+Sección `── ALERTAS DE CATEGORÍA ──` en el script principal, más el modal (después de `sheet-backdrop`), el `#alertas-banner` en la pestaña de gastos y el grupo "Alertas de gasto" en el sidebar. Dos niveles: `NIVEL_AVISO` (umbral configurable, default 80%) y `NIVEL_EXCESO` (100%).
+
+- `chequearAlertaCat(cat)` se llama al final de `addGasto()` y dispara el modal solo si ese rubro cruzó un nivel **nuevo**.
+- `renderAlertasBanner()` se llama desde `renderGastos()`; además destraba el estado guardado si el rubro bajó de nivel (borrar un gasto o subir el presupuesto).
+- El estado es por mes, así que se resetea solo al cambiar de mes. Solo alerta rubros con presupuesto asignado (`PV_CAT_IDS`, excluye "Otro").
+
+**Retoques que el usuario todavía no evaluó**: si el modal centrado resulta invasivo (alternativa: toast desde arriba), si conviene más de un umbral de aviso, y el tono de los textos.
 
 ## Ideas pendientes
 
-Confirmadas por el usuario (2026-08-07), ninguna implementada aún, en orden de prioridad:
+Confirmadas por el usuario (2026-08-07), en orden de prioridad. La #1 ya está hecha:
 
-1. **Alertas de categoría** como pop-up/modal cuando se supera un % del presupuesto de una categoría (ej. "ya usaste 90% de salidas este mes").
+1. ~~**Alertas de categoría**~~ — ✅ hecho el 2026-08-13 (ver sección arriba).
 2. **Detección de gastos recurrentes**: si el mismo gasto se repite ~2-3 meses seguidos, sugerir marcarlo como recurrente. Debe **preguntarle al usuario** (no automático) y permitir **editar el monto** después — con la inflación argentina el importe cambia seguido.
 3. **Vista "esta semana"** como pantalla de inicio: un resumen rápido al abrir la app en vez de una tabla vacía, para dar un motivo de entrar seguido.
 
