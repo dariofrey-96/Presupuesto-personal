@@ -1517,6 +1517,7 @@ html[data-theme="dark"] .alerta-backdrop { background: rgba(0,0,0,.6); }
                 <label>¿Cuántos meses cubre?</label>
                 <select id="gasto-meses">
                   <option value="1" selected>Solo este mes</option>
+                  <option value="auto">Calcularlo según mi presupuesto</option>
                   <option value="2">2 meses</option>
                   <option value="3">3 meses</option>
                   <option value="4">4 meses</option>
@@ -1887,6 +1888,24 @@ function repartirEnMeses(total, meses) {
   partes[0] += total - base * meses;   // el resto del redondeo va al primer mes
   return partes;
 }
+// Para gastos irregulares (arreglos del auto, por ejemplo) uno no sabe cuántos
+// meses cubre el pago, pero sí cuánto tiene presupuestado. Deducimos los meses
+// preguntando cuántas mensualidades de esa categoría se come el gasto.
+const TOPE_MESES_AUTO = 12;
+function mesesSegunPresupuesto(cat, monto) {
+  if (!PV_CAT_IDS.includes(cat)) return { error: 'sinCategoria' };
+  const mensual = getPresupuestoCat(cat);
+  if (!(mensual > 0)) return { error: 'sinPresupuesto' };
+  const exactos = monto / mensual;
+  return {
+    mensual, anual: mensual * 12, exactos,
+    meses: Math.min(Math.max(Math.ceil(exactos - 1e-9), 1), TOPE_MESES_AUTO),
+    superaElAnio: exactos > TOPE_MESES_AUTO,
+  };
+}
+function nombresDeMeses(fechaISO, n) {
+  return Array.from({ length: n }, (_, i) => monthLabelShort(monthKey(new Date(fechaDesplazada(fechaISO, i) + 'T00:00:00'))));
+}
 function fechaDesplazada(fechaISO, nMeses) {
   const b = new Date(fechaISO + 'T00:00:00');
   const d = new Date(b.getFullYear(), b.getMonth() + nMeses, 1);
@@ -1900,9 +1919,39 @@ function addGasto() {
   const cat = $('gasto-cat').value;
   const monto = parseFloat($('gasto-monto').value);
   const nota = $('gasto-nota').value.trim();
-  const meses = Math.max(1, parseInt(($('gasto-meses') || {}).value, 10) || 1);
+  const elegido = ($('gasto-meses') || {}).value || '1';
   if (!fecha) { alert('Elegí una fecha.'); return; }
   if (!monto || monto <= 0) { alert('Cargá un monto válido.'); return; }
+
+  let meses = Math.max(1, parseInt(elegido, 10) || 1);
+  if (elegido === 'auto') {
+    const c = mesesSegunPresupuesto(cat, monto);
+    if (c.error === 'sinCategoria') {
+      alert(`"${catLabel(cat)}" no tiene un presupuesto propio, así que no puedo calcular los meses.\n\nElegí a mano cuántos meses cubre.`);
+      return;
+    }
+    if (c.error === 'sinPresupuesto') {
+      alert(`Para calcularlo solo necesito saber cuánto tenés presupuestado por mes en "${catLabel(cat)}", y hoy está en cero.\n\nAndá a Presupuesto, activá la categoría si hace falta y ponele un monto mensual. Si lo pensás por año, dividilo por 12.`);
+      return;
+    }
+    const cuantos = c.exactos < 1
+      ? `no llega a cubrir un mes entero (${fmtPctInt(c.exactos)} de la mensualidad)`
+      : `equivale a ${c.exactos.toFixed(1).replace('.0', '')} ${c.exactos >= 2 ? 'meses' : 'mes'} de esa bolsa`;
+    const aviso = c.superaElAnio
+      ? `\n\n⚠️ OJO: este gasto se come más de un año entero de esa bolsa. Lo voy a repartir en ${TOPE_MESES_AUTO} meses igual, pero ya te pasaste del presupuesto anual.`
+      : '';
+    const ok = confirm(
+      `${catLabel(cat)}\n\n` +
+      `Tenés presupuestado ${fmtARS(c.mensual)} por mes, o sea ${fmtARS(c.anual)} al año.\n` +
+      `Este gasto de ${fmtARS(monto)} ${cuantos}.${aviso}\n\n` +
+      (c.meses > 1
+        ? `Lo reparto en ${c.meses} meses (${nombresDeMeses(fecha, c.meses).join(', ')}), ${fmtARS(Math.round(monto / c.meses))} en cada uno.`
+        : `Lo dejo entero en ${nombresDeMeses(fecha, 1)[0]}.`) +
+      '\n\n¿Lo hago así?'
+    );
+    if (!ok) return;
+    meses = c.meses;
+  }
 
   const all = loadGastosAll();
   const grupo = meses > 1 ? 'g' + Date.now() : null;

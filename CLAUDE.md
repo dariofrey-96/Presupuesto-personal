@@ -72,6 +72,14 @@ Nació de un problema real del usuario: paga el gimnasio o el mantenimiento del 
 - `removeGasto()` borra el grupo entero (con `confirm`), porque media parte de un pago repartido no significa nada.
 - `renderFuturoNote()` muestra en la pestaña de gastos cuánto ya está cubierto en meses siguientes, para que no parezca que la plata se perdió.
 
+**Opción "Calcularlo según mi presupuesto" (agregada 2026-08-13).** Para gastos irregulares el usuario no sabe cuántos meses cubre el pago, pero sí razona por **bolsa anual** (ej. mantenimiento del auto: "tengo $600.000 al año"). `mesesSegunPresupuesto()` deduce los meses = `ceil(monto / presupuestoMensualDeLaCategoría)`, tope 12.
+
+- Se usa `ceil` (no `round`) a propósito: garantiza que la parte mensual nunca supere el presupuesto del rubro, así el prorrateo no se dispara una falsa alarma de exceso por sí solo.
+- Antes de cargar muestra un `confirm` con toda la cuenta a la vista (mensual, anual, cuántos meses equivale, en qué meses cae y cuánto en cada uno). El usuario no lee código: la cuenta tiene que ser visible.
+- Si el gasto supera los 12 meses de bolsa, reparte en 12 igual pero avisa que se pasó del presupuesto anual.
+- Errores cubiertos: categoría sin presupuesto (o con el toggle apagado) y categoría "Otro", que no tiene presupuesto propio.
+- **Efecto esperado**: cuando la división da exacta, cada mes queda en 100% del rubro y salta la alerta "Usaste todo el presupuesto". Es correcto (ese rubro quedó consumido esos meses), pero si al usuario le resulta ruidoso, la palanca es no chequear alertas en las partes auto-prorrateadas.
+
 ### Gastos fijos / recurrentes (implementado 2026-08-13)
 
 Sección `── GASTOS FIJOS / RECURRENTES ──`, más `#fijos-card` y `#sug-card` en la pestaña de gastos. Clave nueva: `presupuesto_recurrentes_v1` = `{ fijos: {clave: {cat, nota, monto, dia}}, descartados: [claves] }`.
