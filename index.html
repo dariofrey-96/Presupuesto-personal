@@ -1892,19 +1892,46 @@ function repartirEnMeses(total, meses) {
 // meses cubre el pago, pero sí cuánto tiene presupuestado. Deducimos los meses
 // preguntando cuántas mensualidades de esa categoría se come el gasto.
 const TOPE_MESES_AUTO = 12;
-function mesesSegunPresupuesto(cat, monto) {
+function mesKeyOffset(fechaISO, off) { return monthKey(new Date(fechaDesplazada(fechaISO, off) + 'T00:00:00')); }
+function nombreMesOffset(fechaISO, off) { return monthLabelShort(mesKeyOffset(fechaISO, off)); }
+function gastadoEnMes(all, key, cat) {
+  return (all[key] || []).reduce((s, g) => g.cat === cat ? s + g.monto : s, 0);
+}
+// Va llenando el hueco libre de cada mes en vez de dividir en partes iguales:
+// si en el mes del pago ya habías gastado en ese rubro, ahí entra menos y el
+// resto sigue de largo. Así el prorrateo nunca deja un mes pasado de la bolsa.
+function planBolsa(cat, monto, fechaISO) {
   if (!PV_CAT_IDS.includes(cat)) return { error: 'sinCategoria' };
   const mensual = getPresupuestoCat(cat);
   if (!(mensual > 0)) return { error: 'sinPresupuesto' };
-  const exactos = monto / mensual;
+
+  const all = loadGastosAll();
+  const yaEsteMes = gastadoEnMes(all, mesKeyOffset(fechaISO, 0), cat);
+  const partes = [];
+  let resto = Math.round(monto);
+  for (let i = 0; i < TOPE_MESES_AUTO && resto > 0; i++) {
+    const libre = Math.max(Math.round(mensual - gastadoEnMes(all, mesKeyOffset(fechaISO, i), cat)), 0);
+    if (libre <= 0) continue;                       // ese mes ya está lleno, seguimos
+    const parte = Math.min(resto, libre);
+    partes.push({ offset: i, monto: parte });
+    resto -= parte;
+  }
+  // No entró ni llenando un año entero de bolsa: el sobrante va al último mes.
+  const desborde = resto;
+  if (desborde > 0) {
+    if (partes.length) partes[partes.length - 1].monto += desborde;
+    else partes.push({ offset: 0, monto: desborde });
+  }
   return {
-    mensual, anual: mensual * 12, exactos,
-    meses: Math.min(Math.max(Math.ceil(exactos - 1e-9), 1), TOPE_MESES_AUTO),
-    superaElAnio: exactos > TOPE_MESES_AUTO,
+    mensual, anual: mensual * 12, exactos: monto / mensual,
+    yaEsteMes, libreEsteMes: Math.max(mensual - yaEsteMes, 0),
+    partes, desborde,
   };
 }
-function nombresDeMeses(fechaISO, n) {
-  return Array.from({ length: n }, (_, i) => monthLabelShort(monthKey(new Date(fechaDesplazada(fechaISO, i) + 'T00:00:00'))));
+function detallePlan(fechaISO, partes) {
+  const linea = p => `   ${nombreMesOffset(fechaISO, p.offset)} → ${fmtARS(p.monto)}`;
+  if (partes.length <= 6) return partes.map(linea).join('\n');
+  return [linea(partes[0]), linea(partes[1]), `   ... (${partes.length - 3} meses más)`, linea(partes[partes.length - 1])].join('\n');
 }
 function fechaDesplazada(fechaISO, nMeses) {
   const b = new Date(fechaISO + 'T00:00:00');
@@ -1923,9 +1950,9 @@ function addGasto() {
   if (!fecha) { alert('Elegí una fecha.'); return; }
   if (!monto || monto <= 0) { alert('Cargá un monto válido.'); return; }
 
-  let meses = Math.max(1, parseInt(elegido, 10) || 1);
+  let partes;
   if (elegido === 'auto') {
-    const c = mesesSegunPresupuesto(cat, monto);
+    const c = planBolsa(cat, monto, fecha);
     if (c.error === 'sinCategoria') {
       alert(`"${catLabel(cat)}" no tiene un presupuesto propio, así que no puedo calcular los meses.\n\nElegí a mano cuántos meses cubre.`);
       return;
@@ -1934,33 +1961,35 @@ function addGasto() {
       alert(`Para calcularlo solo necesito saber cuánto tenés presupuestado por mes en "${catLabel(cat)}", y hoy está en cero.\n\nAndá a Presupuesto, activá la categoría si hace falta y ponele un monto mensual. Si lo pensás por año, dividilo por 12.`);
       return;
     }
-    const cuantos = c.exactos < 1
-      ? `no llega a cubrir un mes entero (${fmtPctInt(c.exactos)} de la mensualidad)`
-      : `equivale a ${c.exactos.toFixed(1).replace('.0', '')} ${c.exactos >= 2 ? 'meses' : 'mes'} de esa bolsa`;
-    const aviso = c.superaElAnio
-      ? `\n\n⚠️ OJO: este gasto se come más de un año entero de esa bolsa. Lo voy a repartir en ${TOPE_MESES_AUTO} meses igual, pero ya te pasaste del presupuesto anual.`
+    const yaGastado = c.yaEsteMes > 0
+      ? `\nEn ${nombreMesOffset(fecha, 0)} ya llevás ${fmtARS(c.yaEsteMes)} en este rubro, así que ahí ${c.libreEsteMes > 0 ? `entran ${fmtARS(c.libreEsteMes)} más` : 'ya no entra nada'}.`
+      : '';
+    const desborde = c.desborde > 0
+      ? `\n\n⚠️ OJO: no entra ni llenando un año entero de esa bolsa. Te pasás del presupuesto anual por ${fmtARS(c.desborde)}, que quedan cargados en el último mes.`
       : '';
     const ok = confirm(
       `${catLabel(cat)}\n\n` +
-      `Tenés presupuestado ${fmtARS(c.mensual)} por mes, o sea ${fmtARS(c.anual)} al año.\n` +
-      `Este gasto de ${fmtARS(monto)} ${cuantos}.${aviso}\n\n` +
-      (c.meses > 1
-        ? `Lo reparto en ${c.meses} meses (${nombresDeMeses(fecha, c.meses).join(', ')}), ${fmtARS(Math.round(monto / c.meses))} en cada uno.`
-        : `Lo dejo entero en ${nombresDeMeses(fecha, 1)[0]}.`) +
+      `Tenés presupuestado ${fmtARS(c.mensual)} por mes, o sea ${fmtARS(c.anual)} al año.${yaGastado}${desborde}\n\n` +
+      (c.partes.length > 1
+        ? `Reparto los ${fmtARS(monto)} así:\n${detallePlan(fecha, c.partes)}`
+        : `Lo dejo entero en ${nombreMesOffset(fecha, c.partes[0].offset)}.`) +
       '\n\n¿Lo hago así?'
     );
     if (!ok) return;
-    meses = c.meses;
+    partes = c.partes;
+  } else {
+    const meses = Math.max(1, parseInt(elegido, 10) || 1);
+    partes = repartirEnMeses(monto, meses).map((m, i) => ({ offset: i, monto: m }));
   }
 
   const all = loadGastosAll();
-  const grupo = meses > 1 ? 'g' + Date.now() : null;
-  repartirEnMeses(monto, meses).forEach((parte, i) => {
-    const f = fechaDesplazada(fecha, i);
+  const grupo = partes.length > 1 ? 'g' + Date.now() : null;
+  partes.forEach((p, i) => {
+    const f = fechaDesplazada(fecha, p.offset);
     const key = monthKey(new Date(f + 'T00:00:00'));
     if (!all[key]) all[key] = [];
-    const item = { id: Date.now() + i, fecha: f, cat, monto: parte, nota };
-    if (grupo) Object.assign(item, { grupo, cuota: i + 1, cuotas: meses, montoTotal: monto, fechaPago: fecha });
+    const item = { id: Date.now() + i, fecha: f, cat, monto: p.monto, nota };
+    if (grupo) Object.assign(item, { grupo, cuota: i + 1, cuotas: partes.length, montoTotal: monto, fechaPago: fecha });
     all[key].push(item);
     all[key].sort((a, b) => b.fecha.localeCompare(a.fecha));
   });
