@@ -104,6 +104,21 @@ Cuatro bloques: gastado de la semana con comparación contra la semana anterior 
 
 **Nota para verificar en el navegador**: si el panel de preview no está compositando, las transiciones CSS quedan congeladas y `getComputedStyle` del `body` devuelve el color viejo al cambiar de tema. No es un bug — desactivar `transition` para medir.
 
+### Importar resumen de tarjeta / billetera (implementado 2026-08-14)
+
+Sección `── IMPORTAR RESUMEN ──`, modal `#imp-modal`, botón en el formulario de gastos. Clave nueva: `presupuesto_import_reglas_v1` = `{ "clave de comercio": "catId" }`.
+
+- **pdf.js se carga por CDN y a demanda** (`cargarPdfJs()`), recién al abrir el importador — no penaliza el arranque de la app. Versión 3.11.174 (UMD), worker aparte.
+- `lineasDelPdf()` reagrupa los fragmentos posicionados del PDF en líneas juntando los que están a la misma altura (`transform[5]`, tolerancia de 3pt) y ordenando por `x`.
+- `parsearLineas()` es **agnóstico del banco**: busca fecha + importe en cada línea. Descarta por `RE_IGNORAR` (totales, saldo, vencimiento, CBU, "su pago") y descarta montos negativos (pagos y devoluciones no son gastos). Si hay varias columnas (pesos y dólares), **se queda con el importe más grande** — en Argentina el de pesos siempre lo es.
+- `parsearMonto()` detecta si el separador decimal es coma o punto mirando cuál viene último.
+- Categorización: primero las reglas aprendidas, después `DICCIONARIO_CAT` (comercios argentinos), si no cae en "otro".
+- **Aprende de las correcciones**: `claveComercio()` toma las 2 primeras palabras sin números, así "FRAVEGA CUOTA 03/06" y "FRAVEGA CUOTA 04/06" son el mismo comercio. Verificado que el segundo resumen ya acierta solo.
+- **Nunca importa sin revisión**: pantalla con checkbox, monto editable y categoría editable por fila. Los duplicados (misma fecha + monto + descripción) vienen destildados.
+- **Fallback de texto pegado** para resúmenes escaneados o protegidos, que pdf.js no puede leer.
+
+**Pendiente de afinar con un resumen real del usuario** — el lector se probó con formatos sintéticos (Galicia/Santander/Mercado Pago) y con un PDF generado a mano, no con uno suyo. Al 2026-08-14 todavía no lo mandó.
+
 ## Ideas pendientes
 
 Confirmadas por el usuario (2026-08-07). Las tres primeras ya están hechas:
