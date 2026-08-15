@@ -125,8 +125,10 @@ El usuario preguntó si acá estaban los cambios que se habían hecho en el repo
 
 - ✅ **Deslizar con el dedo para cambiar de pestaña** — portado el 2026-08-14. `SECCIONES = ['inicio','presupuesto','gastos','historico','proyeccion']`, umbral de 60px, y exige que el gesto sea claramente horizontal (`|dx| > |dy| * 1.5`). `gestoBloqueado()` lo desactiva sobre canvas, inputs, selects, textareas, el sidebar y cualquier contenedor con scroll horizontal (la tira de KPIs y las tablas). `hayAlgoAbierto()` lo desactiva con el sidebar o un modal abierto. Allá usaban `.active`; acá las vistas se muestran con `style.display` y se llama a `setTab()` directo.
 - ✅ **Tooltip del gráfico en modo oscuro** — arreglado el 2026-08-14. Los colores del globito estaban fijos en modo claro y `updateChartColors()` solo tocaba ejes y grilla, así que en oscuro quedaba blanco. En el repo hermano esto no pasa porque leen variables CSS con `getCSSVar()`.
-- ⏳ **Haptics** (vibración al mover sliders, `navigator.vibrate` + switch nativo en iOS) — existe en Plan de Retiro (`hapticTick()`, ~línea 1435), **no está acá**. Pendiente de decisión del usuario.
-- ⏳ **Bottom sheet con swipe-to-dismiss** (arrastrar el panel de ajustes hacia abajo para cerrarlo) — existe en Plan de Retiro (~línea 1490), **no está acá**. Pendiente de decisión del usuario.
+- ✅ **Haptics** (`hapticTick()`, `navigator.vibrate(8)` con freno de 35ms) — portado el 2026-08-14 sobre todos los `input[type=range]` del `aside`. **En iOS no vibra**: no hay API de vibración web y no hay forma de engancharla a un arrastre continuo. En el repo hermano resolvieron los botones +/- con un `<input type="checkbox" switch>` nativo invisible encima del botón, pero acá no hay botones +/-, solo sliders — así que esa parte no aplica.
+- ✅ **Bottom sheet con swipe-to-dismiss** — portado el 2026-08-14. Se agarra de `.sheet-handle` o `.sheet-title-row` (no de la lista de parámetros, que necesita su scroll). Cierra con arrastre > 18% de la altura de pantalla o con velocidad. Guarda extra que no está en el repo hermano: `getComputedStyle(aside).position !== 'fixed'` corta el gesto en escritorio (≥900px), donde el panel es `static` y no es un cajón.
+
+**Cuidado al verificar gestos con herramientas**: medir justo después de un `resize_window` puede leer un `window.innerHeight` viejo y hacer que el umbral de cierre dé cualquier cosa. Repetir la prueba varias veces antes de creerle a un resultado raro.
 
 ## Ideas pendientes
 

@@ -3595,6 +3595,89 @@ function hayAlgoAbierto() {
   }, { passive: true });
 })();
 
+// ── VIBRACIÓN AL MOVER LOS DESLIZADORES ───────────────────────────────────
+// Android/Chrome: usa la Vibration API estándar y anda bien.
+// iOS Safari: no existe una API de vibración para la web, y no hay forma
+// conocida de engancharla a un arrastre continuo. Ahí simplemente no vibra;
+// es una limitación real del navegador, no del código.
+let _ultimoHaptic = 0;
+function hapticTick() {
+  const ahora = Date.now();
+  if (ahora - _ultimoHaptic < 35) return;   // si no, satura durante un arrastre rápido
+  _ultimoHaptic = ahora;
+  try { if (navigator.vibrate) navigator.vibrate(8); } catch (e) {}
+}
+// Listener aparte: no reemplaza al que ya recalcula y guarda.
+document.querySelectorAll('aside input[type="range"]').forEach(el => {
+  el.addEventListener('input', hapticTick);
+});
+
+// ── ARRASTRAR HACIA ABAJO PARA CERRAR EL PANEL DE PARÁMETROS ──────────────
+// Se agarra de la barrita gris o del título, como en las apps nativas, para
+// no pisar el scroll de la lista de parámetros.
+(function () {
+  const asideEl = $('aside'), backdropEl = $('sheet-backdrop');
+  if (!asideEl) return;
+  const zonas = [asideEl.querySelector('.sheet-handle'), asideEl.querySelector('.sheet-title-row')].filter(Boolean);
+  if (!zonas.length) return;
+
+  let arrastrando = false, y0 = 0, yActual = 0, t0 = 0;
+  const getY = e => (e.touches ? e.touches[0].clientY : e.clientY);
+
+  function onStart(e) {
+    // En escritorio el panel es fijo en pantalla, no es un cajón: no aplica.
+    if (!asideEl.classList.contains('open') || getComputedStyle(asideEl).position !== 'fixed') return;
+    arrastrando = true;
+    y0 = yActual = getY(e);
+    t0 = Date.now();
+    asideEl.style.transition = 'none';
+  }
+  function onMove(e) {
+    if (!arrastrando) return;
+    yActual = getY(e);
+    const delta = Math.max(0, yActual - y0);
+    asideEl.style.transform = `translateY(${delta}px)`;
+    if (backdropEl) backdropEl.style.opacity = String(Math.max(0.15, 1 - delta / (window.innerHeight * 0.5)));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onEnd() {
+    if (!arrastrando) return;
+    arrastrando = false;
+    const delta = Math.max(0, yActual - y0);
+    const transcurrido = Date.now() - t0;
+    // La velocidad solo sirve si pasó al menos un cuadro; si no, un toque con
+    // pulso podría calcular una velocidad absurda y cerrar el panel de gusto.
+    const velocidad = transcurrido > 16 ? delta / transcurrido : 0;
+    const cerrar = delta > window.innerHeight * 0.18 || (delta > 24 && velocidad > 0.5);
+    if (cerrar) {
+      asideEl.style.transition = '';
+      asideEl.style.transform = '';
+      if (backdropEl) backdropEl.style.opacity = '';
+      hapticTick();
+      toggleSidebar();
+    } else {
+      asideEl.style.transition = 'transform .25s ease';
+      asideEl.style.transform = 'translateY(0)';
+      if (backdropEl) { backdropEl.style.transition = 'opacity .25s ease'; backdropEl.style.opacity = ''; }
+      setTimeout(() => {
+        asideEl.style.transition = '';
+        asideEl.style.transform = '';
+        if (backdropEl) backdropEl.style.transition = '';
+      }, 260);
+    }
+  }
+
+  zonas.forEach(z => {
+    z.addEventListener('touchstart', onStart, { passive: true });
+    z.addEventListener('touchmove', onMove, { passive: false });
+    z.addEventListener('touchend', onEnd);
+    z.addEventListener('touchcancel', onEnd);
+    z.addEventListener('mousedown', onStart);   // para poder probarlo con mouse
+  });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onEnd);
+})();
+
 // ── TOOLTIP TÁCTIL EN LA BARRA DE DISTRIBUCIÓN (el CSS ya cubre el :hover de mouse) ──
 const distBarEl = $('dist-bar');
 if (distBarEl) {
