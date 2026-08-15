@@ -20,6 +20,16 @@ Dos apps hermanas (HTML/JS, hosteadas en GitHub Pages), mismo sistema de diseño
 
 App de una sola página en pesos argentinos. Todo vive en `index.html` (~2200 líneas, HTML + CSS + JS en el mismo archivo). El repo solo tiene `README.md` e `index.html` — sin build, sin dependencias, sin backend, sin GitHub Actions.
 
+### Navegación por mes en "Gastos del mes" (implementado 2026-08-15)
+
+**Bug que lo motivó**: `renderGastos()` y todo lo relacionado usaban `monthKey()` (hoy) fijo, así que la pestaña solo mostraba el mes corriente. Al importar el resumen de tarjeta en agosto, los gastos caían en julio y quedaban **cargados pero invisibles** — el usuario creyó que no se había importado nada.
+
+- Variable `mesVisible` (arranca en `monthKey()`), flechitas `‹ ›` en el encabezado y botón "Volver a hoy" que aparece solo fuera del mes actual. El nombre del mes se pinta en dorado cuando no es el actual.
+- Se cambió `monthKey()` → `mesVisible` en: `renderGastos`, `removeGasto`, `closeMonth`, `computeSuperavitRealActual`, `gastosPorCatMes`, `get/setAlertaEstado`, `renderAlertasBanner`, `comprometidoFuturo`, `estadoFijos`, `agregarFijoAlMes` y el título de la tarjeta de fijos.
+- **Siguen usando `monthKey()` a propósito** (hablan de hoy, no del mes mirado): `ritmoDelMes()` de la pantalla de inicio, el fallback de `parsearLineas`, y `mesesRecientes()` en la detección de recurrentes.
+- `renderInicio()` guarda y restaura `mesVisible` alrededor de `pintarInicio()`: la pantalla de inicio siempre habla de hoy aunque en Gastos estés mirando julio.
+- Al terminar de importar, `confirmarImport()` **salta al mes donde cayeron los gastos** y lo dice en el mensaje. Si quedaron repartidos en varios meses, los lista.
+
 ### Pestañas
 
 1. **Presupuesto** — sliders por categoría (salario, alquiler, servicios, supermercado, nafta, prepaga, etc.) para armar el presupuesto mensual planificado.

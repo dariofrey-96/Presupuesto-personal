@@ -451,7 +451,22 @@ tbody td:nth-child(2) { text-align: left; color: var(--text); }
 
 /* ── GASTOS DEL MES ── */
 .gastos-hdr { display: flex; flex-direction: column; gap: 8px; }
-.gastos-hdr-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.gastos-hdr-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mes-nav { display: flex; align-items: center; gap: 2px; }
+.mes-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  font-size: .95rem; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.mes-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--divider); }
+.mes-nav .gastos-mes { min-width: 118px; text-align: center; }
+.mes-hoy {
+  margin-left: 6px; padding: 4px 10px; border: none; border-radius: 100px;
+  background: var(--accent-soft); color: var(--accent-text);
+  font: inherit; font-size: .66rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.mes-hoy:hover { background: var(--accent); color: #fff; }
+.mes-viejo { color: var(--gold-text); }
 .gastos-mes { font-size: .7rem; color: var(--text-3); text-transform: capitalize; }
 .btn-close-month {
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 100px;
@@ -1588,7 +1603,12 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
           <div class="gastos-hdr">
             <div class="gastos-hdr-top">
               <span class="chart-title">Registro de gastos reales</span>
-              <span class="gastos-mes" id="gastos-mes-label"></span>
+              <span class="mes-nav">
+                <button class="mes-btn" onclick="moverMes(-1)" title="Mes anterior" aria-label="Mes anterior">‹</button>
+                <span class="gastos-mes" id="gastos-mes-label"></span>
+                <button class="mes-btn" onclick="moverMes(1)" title="Mes siguiente" aria-label="Mes siguiente">›</button>
+                <button class="mes-hoy" id="mes-hoy" onclick="irAlMesActual()" style="display:none">Volver a hoy</button>
+              </span>
             </div>
             <button class="btn-close-month" onclick="closeMonth()">📌 Cerrar mes</button>
           </div>
@@ -1965,6 +1985,18 @@ function monthLabelShort(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'short', year: '2-digit' }).replace('.', '');
 }
+// Mes que se está mirando en la pestaña de gastos. Arranca en el actual, pero
+// se puede navegar: al importar un resumen los gastos suelen caer en el mes
+// anterior, y sin esto quedaban cargados pero invisibles.
+let mesVisible = monthKey();
+function moverMes(delta) {
+  const [y, m] = mesVisible.split('-').map(Number);
+  mesVisible = monthKey(new Date(y, m - 1 + delta, 1));
+  renderGastos();
+}
+function irAlMesActual() { mesVisible = monthKey(); renderGastos(); }
+function verMes(key) { mesVisible = key; renderGastos(); }
+
 function loadGastosAll() {
   try { return JSON.parse(localStorage.getItem(LS_GASTOS) || '{}'); } catch (e) { return {}; }
 }
@@ -2099,7 +2131,7 @@ function addGasto() {
 }
 function removeGasto(id) {
   const all = loadGastosAll();
-  const key = monthKey();
+  const key = mesVisible;
   if (!all[key]) return;
   const target = all[key].find(g => g.id === id);
   if (!target) return;
@@ -2117,7 +2149,7 @@ function removeGasto(id) {
 // Partes de pagos repartidos que caen en meses posteriores al actual.
 function comprometidoFuturo() {
   const all = loadGastosAll();
-  const actual = monthKey();
+  const actual = mesVisible;
   let total = 0;
   const meses = [];
   Object.keys(all).sort().forEach(k => {
@@ -2142,10 +2174,14 @@ function getPresupuestoCat(id) {
   return g(id);
 }
 function renderGastos() {
-  const key = monthKey();
+  const key = mesVisible;
   const all = loadGastosAll();
   const list = all[key] || [];
-  $('gastos-mes-label').textContent = monthLabel(key);
+  const esMesActual = key === monthKey();
+  const lbl = $('gastos-mes-label');
+  lbl.textContent = monthLabel(key);
+  lbl.className = 'gastos-mes' + (esMesActual ? '' : ' mes-viejo');
+  if ($('mes-hoy')) $('mes-hoy').style.display = esMesActual ? 'none' : '';
 
   const total = list.reduce((s, g) => s + g.monto, 0);
   $('gk-total').textContent = fmtARS(total);
@@ -2204,7 +2240,7 @@ function renderGastos() {
 
   const tbody = $('tbody-gastos');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="gastos-empty">Todavía no cargaste gastos este mes. Usá el formulario de arriba para empezar.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="gastos-empty">No hay gastos cargados en ${monthLabel(key)}.${esMesActual ? ' Usá el formulario de arriba para empezar.' : ' Usá las flechitas de arriba para mirar otro mes.'}</td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(g => `
@@ -2244,11 +2280,11 @@ function saveAlertasEstado(all) {
 // Estado por rubro y por mes: hasta qué nivel ya se avisó, y si el usuario lo silenció.
 function getAlertaEstado(cat) {
   const all = loadAlertasEstado();
-  const m = all[monthKey()] || {};
+  const m = all[mesVisible] || {};
   return Object.assign({ nivel: 0, mute: false }, m[cat]);
 }
 function setAlertaEstado(cat, patch) {
-  const key = monthKey();
+  const key = mesVisible;
   const all = loadAlertasEstado();
   if (!all[key]) all[key] = {};
   all[key][cat] = Object.assign({ nivel: 0, mute: false }, all[key][cat], patch);
@@ -2261,7 +2297,7 @@ function nivelAlerta(pct, umbral) {
   return 0;
 }
 function gastosPorCatMes() {
-  const list = loadGastosAll()[monthKey()] || [];
+  const list = loadGastosAll()[mesVisible] || [];
   const by = {};
   list.forEach(g => { by[g.cat] = (by[g.cat] || 0) + g.monto; });
   return by;
@@ -2351,7 +2387,7 @@ function renderAlertasBanner() {
 
   // Si un rubro bajó de nivel (borraste un gasto o subiste el presupuesto),
   // destrabamos el aviso para que pueda volver a saltar si lo cruzás de nuevo.
-  const key = monthKey();
+  const key = mesVisible;
   const all = loadAlertasEstado();
   let dirty = false;
   rows.forEach(r => {
@@ -2465,7 +2501,7 @@ function detectarCandidatosFijos() {
 
 function estadoFijos() {
   const rec = loadRecurrentes();
-  const yaEsteMes = new Set((loadGastosAll()[monthKey()] || []).map(x => claveGasto(x.cat, x.nota)));
+  const yaEsteMes = new Set((loadGastosAll()[mesVisible] || []).map(x => claveGasto(x.cat, x.nota)));
   return Object.entries(rec.fijos)
     .map(([clave, f]) => ({ clave, cat: f.cat, nota: f.nota, monto: f.monto, dia: f.dia, cargado: yaEsteMes.has(clave) }))
     .sort((a, b) => (a.cargado - b.cargado) || etiquetaFijo(a.cat, a.nota).localeCompare(etiquetaFijo(b.cat, b.nota)));
@@ -2473,7 +2509,7 @@ function estadoFijos() {
 
 let _seqGasto = 0;
 function agregarFijoAlMes(f, monto) {
-  const key = monthKey();
+  const key = mesVisible;
   const [y, m] = key.split('-').map(Number);
   const ultimoDia = new Date(y, m, 0).getDate();
   const dia = Math.min(Math.max(parseInt(f.dia, 10) || 1, 1), ultimoDia);
@@ -2579,7 +2615,7 @@ function renderFijos() {
 
   el.innerHTML = `
     <div class="fc-hdr">
-      <span class="fc-title">Gastos fijos de ${monthLabel(monthKey())}</span>
+      <span class="fc-title">Gastos fijos de ${monthLabel(mesVisible)}</span>
       <span class="fc-count">${total - pendientes} de ${total} cargados</span>
     </div>
     ${filas}
@@ -3005,8 +3041,23 @@ function confirmarImport() {
   saveGastosAll(all);
   saveReglasImport(reglas);
   cerrarImport();
+
+  // Los resúmenes casi siempre son del mes pasado. Si los gastos no cayeron en
+  // el mes que estás mirando, te llevo hasta ahí: si no, quedan cargados pero
+  // invisibles y parece que no se importó nada.
+  const porMes = {};
+  elegidas.forEach(f => { const k = f.fecha.slice(0, 7); porMes[k] = (porMes[k] || 0) + 1; });
+  const mesPrincipal = Object.keys(porMes).sort((a, b) => porMes[b] - porMes[a])[0];
+  const salte = mesPrincipal && mesPrincipal !== mesVisible;
+  if (salte) mesVisible = mesPrincipal;
   renderGastos();
+
+  const otrosMeses = Object.keys(porMes).length > 1
+    ? `\n\nOjo: quedaron repartidos en ${Object.keys(porMes).length} meses (${Object.keys(porMes).sort().map(monthLabelShort).join(', ')}). Usá las flechitas para verlos.`
+    : '';
   alert(`Listo: importé ${elegidas.length} gasto${elegidas.length > 1 ? 's' : ''}.` +
+        (salte ? `\n\nSon de ${monthLabel(mesPrincipal)}, así que te llevo a ese mes.` : '') +
+        otrosMeses +
         (aprendidas ? `\n\nMe guardé ${aprendidas === 1 ? 'tu corrección' : `tus ${aprendidas} correcciones`} de categoría para la próxima vez.` : ''));
   cats.forEach(chequearAlertaCat);
 }
@@ -3075,6 +3126,13 @@ function irACargarGasto() {
 
 function renderInicio() {
   if (!$('ini-total')) return;
+  // La pantalla de inicio siempre habla de hoy, aunque en la pestaña de gastos
+  // estés mirando otro mes.
+  const mesGuardado = mesVisible;
+  mesVisible = monthKey();
+  try { pintarInicio(); } finally { mesVisible = mesGuardado; }
+}
+function pintarInicio() {
   const sem = resumenSemana(0);
   const prev = resumenSemana(-1);
   const idx = indiceDiaHoy();
@@ -3197,7 +3255,7 @@ function saveSnapshots(all) {
   try { localStorage.setItem(LS_SNAPSHOTS, JSON.stringify(all)); } catch (e) {}
 }
 function closeMonth() {
-  const key = monthKey();
+  const key = mesVisible;
   const salario = g('salario');
   let totalPresu = 0;
   PV_CAT_IDS.forEach(id => { totalPresu += getPresupuestoCat(id); });
@@ -3281,7 +3339,7 @@ function tc() { return parseFloat($('tipoCambio').value) || 0; }
 function saveTC() { try { localStorage.setItem(LS_TC, $('tipoCambio').value || ''); } catch (e) {} }
 function loadTC() { try { const r = localStorage.getItem(LS_TC); if (r) $('tipoCambio').value = r; } catch (e) {} }
 function computeSuperavitRealActual() {
-  const key = monthKey();
+  const key = mesVisible;
   const all = loadGastosAll();
   const list = all[key] || [];
   const gastoReal = list.reduce((s, x) => s + x.monto, 0);
