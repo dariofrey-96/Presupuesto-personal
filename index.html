@@ -1329,8 +1329,10 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
       </div>
     </div>
 
-    <!-- BARRA DISTRIBUCIÓN -->
-    <div class="dist-card">
+    <!-- BARRA DISTRIBUCIÓN — era de la pantalla Presupuesto y quedaba encima de
+         todas las vistas. Oculta: la distribución del ingreso ahora vive dentro
+         del Resumen. Se borra del todo en la etapa 2, junto con recalc(). -->
+    <div class="dist-card" id="dist-card" style="display:none">
       <div class="dist-card-hdr">Distribución del ingreso</div>
       <div class="dist-bar" id="dist-bar"></div>
       <div class="dist-legend" id="dist-legend"></div>
