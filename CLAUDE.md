@@ -117,7 +117,22 @@ Sección `── IMPORTAR RESUMEN ──`, modal `#imp-modal`, botón en el form
 - **Nunca importa sin revisión**: pantalla con checkbox, monto editable y categoría editable por fila. Los duplicados (misma fecha + monto + descripción) vienen destildados.
 - **Fallback de texto pegado** para resúmenes escaneados o protegidos, que pdf.js no puede leer.
 
-**Pendiente de afinar con un resumen real del usuario** — el lector se probó con formatos sintéticos (Galicia/Santander/Mercado Pago) y con un PDF generado a mano, no con uno suyo. Al 2026-08-14 todavía no lo mandó.
+**Afinado contra el resumen real (2026-08-15).** El usuario pasó su Resumen Visa de Santander (cierre 30/07/26). El lector v1 fallaba en 6 cosas; todas corregidas. Lo que enseñó ese resumen, que vale para cualquier tarjeta argentina:
+
+- **Las cuotas traen la fecha de la compra original**, no la del período. "Perfumerías Juleriaque 8 de 10" figuraba con fecha 21/12/25 y se cargaba en diciembre 2025, cuando esa cuota se cobra ahora. Eran $463K de $577K yendo a meses que ya pasaron. Ahora `RE_CUOTA` las detecta y las reubica en el **mes del resumen**, que se deduce del mes más repetido entre los consumos que NO son cuotas (así no depende del banco).
+- **Los consumos en dólares venían como pesos** (Apple U$S 2,99 → $3). Ahora `importesDeLinea()` separa por símbolo: `U$S` vs `$`. Se convierten con el TC de la app; si no hay, se usa el `tc1500,000` que el propio resumen trae en la línea del pago anterior; si tampoco, la fila viene destildada.
+- **Líneas de continuación sin fecha**: el segundo cargo de Apple del mismo día no repite la fecha y se perdía. Ahora la fecha se arrastra (`fechaVigente`).
+- **Números entre paréntesis son bases de cálculo, no importes**: "Iibb percep-cord 3,00%( 9394,88) $ 281,84" tomaba 9394,88. Se descarta todo lo que esté entre paréntesis.
+- **El número de comprobante ensuciaba la descripción** ("Ypf urca 302447"). Se quitan los números de 5+ dígitos.
+- **La letra chica del final tiene fechas y montos** y generaba movimientos fantasma. `RE_FIN_MOVIMIENTOS` corta el parseo al llegar a "Términos y condiciones".
+
+**Regla clave que costó encontrar**: el modo de respaldo (adivinar importes sin símbolo de moneda, para bancos que no usan `$`) **solo se aplica en líneas que traen su propia fecha**. Sin esa restricción, la línea de tasas ("En pesos: 77,900 % En dólares: 0,000 %") se colgaba de la fecha arrastrada y entraba como un gasto de $78. Restringirlo por documento (¿usa `$` en alguna parte?) rompía los resúmenes mixtos; por línea con fecha propia, funcionan los tres casos.
+
+**Validación fuerte disponible**: la suma de lo importado tiene que dar exactamente el "Total a pagar" del resumen. Con el de Santander da $576.940 vs $576.940,88 y U$S 10,04 vs U$S 10,04. **Si se toca el parser, repetir esa comparación** — es la prueba que detecta tanto lo que falta como lo que sobra.
+
+Categorías nuevas en el diccionario a partir de comercios reales: peajes (Caminos de las Sierras), perfumerías (Juleriaque), electro (Frávega), universidades ("univ "), e impuestos/percepciones → `cnc`.
+
+**El PDF del usuario no se commitea nunca.** Para probar se copia a `_tmp-resumen.pdf` (está en `.gitignore`), se sirve por el preview, y se borra al terminar.
 
 ### Paridad con Plan de Retiro (revisado 2026-08-14)
 

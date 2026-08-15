@@ -827,7 +827,13 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
 .imp-tabla tr.dup { opacity: .5; }
 .imp-fecha { color: var(--muted); white-space: nowrap; font-size: .72rem; }
 .imp-desc { max-width: 220px; word-break: break-word; line-height: 1.3; }
-.imp-dup-chip { display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 100px; font-size: .58rem; font-weight: 700; background: var(--gold-soft); color: var(--gold-text); }
+.imp-dup-chip, .imp-cuota-chip, .imp-usd-chip {
+  display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 100px;
+  font-size: .58rem; font-weight: 700; white-space: nowrap;
+}
+.imp-dup-chip   { background: var(--gold-soft);   color: var(--gold-text); }
+.imp-cuota-chip { background: var(--accent-soft); color: var(--accent-text); }
+.imp-usd-chip   { background: var(--teal-soft);   color: var(--teal-text); }
 .imp-tabla input[type="number"] {
   width: 96px; padding: 5px 7px; font: inherit; font-size: .74rem; text-align: right;
   border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text);
@@ -2616,18 +2622,19 @@ function saveReglasImport(r) {
 // Diccionario de comercios argentinos. Se recorre en orden: gana el primero.
 const DICCIONARIO_CAT = [
   ['supermercado',      ['coto','carrefour','jumbo','disco ','vea ','changomas','walmart','libertad','makro','dia %','supermercado','almacen','verduleria','carniceria','panaderia','fiambreria','changomas']],
-  ['nafta',             ['ypf','shell','axion','puma energ','estacion de servicio','gnc','petrobras','refinor']],
+  ['nafta',             ['ypf','shell','axion','puma energ','estacion de servicio','gnc','petrobras','refinor','peaje','caminos de las','autopista','ausa','aubasa','sube ','estacionamiento']],
   ['servicios',         ['edenor','edesur','metrogas','aysa','camuzzi','naturgy','telecom','fibertel','cablevision','personal ','claro ','movistar','directv','flow','telecentro','edea','edelap','epec','aguas ']],
   ['suscripciones',     ['netflix','spotify','disney','hbo','max.com','amazon prime','youtube','apple.com','itunes','icloud','google *','openai','chatgpt','dropbox','microsoft','adobe','canva','paramount','crunchyroll']],
   ['juntadas',          ['restaurant','parrilla','resto','bar ','cafe','coffee','starbucks','mcdonald','burger','subway','mostaza','pizza','pizzer','heladeria','grido','rappi','pedidosya','pedidos ya','cerveceria','sushi','confiteria','bodegon']],
-  ['farmacia',          ['farmacia','farmacity','farmatodo','dr. ahorro','simplicity','vantage']],
+  ['farmacia',          ['farmacia','farmacity','farmatodo','dr. ahorro','simplicity','vantage','perfumeria','juleriaque','get the look','pigmento']],
+  ['cnc',               ['fravega','musimundo','garbarino','naldo','cetrogar','ferreteria','easy ','sodimac','mercadolibre','mercado libre','impuesto de sellos','iibb','percep','iva rg','db.rg','rg 5617']],
   ['prepaga',           ['osde','swiss medical','galeno','medife','omint','sancor salud','medicus','hospital italiano','premedic']],
   ['gimnasio',          ['gimnasio','sportclub','megatlon','smartfit','smart fit','crossfit',' gym']],
   ['mantenimientoAuto', ['taller','gomeria','neumatic','repuesto','lubricentro','service auto','autopartes','mecanic']],
   ['seguroAuto',        ['seguro','allianz','zurich','mapfre','sancor seguros','federacion patronal','rivadavia seguros','la caja','provincia seguros']],
   ['patente',           ['patente','rentas','infraccion','vtv','municipalidad']],
   ['viajes',            ['despegar','aerolineas','latam','flybondi','jetsmart','booking','airbnb','airlines','hotel','turismo','almundo']],
-  ['estudios',          ['udemy','coursera','platzi','domestika','universidad','instituto','libreria']],
+  ['estudios',          ['udemy','coursera','platzi','domestika','universidad','univ ','instituto','libreria','fundacion univ','escuela de negocios','posgrado','maestria']],
   ['deportes',          ['padel','futbol','tenis','club atletico','cancha']],
   ['colegio',           ['colegio','jardin de infantes','escuela','cuota escolar']],
   ['alquiler',          ['alquiler','expensas','inmobiliaria','administracion consorcio']],
@@ -2671,8 +2678,12 @@ function parsearMonto(txt) {
 
 const RE_FECHA = /\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/;
 const RE_MONTO = /-?\$?\s?\d{1,3}(?:\.\d{3})+,\d{2}-?|-?\$?\s?\d{1,3}(?:,\d{3})+\.\d{2}-?|-?\$?\s?\d+[.,]\d{2}-?/g;
-// Líneas que nunca son un consumo: totales, vencimientos, datos de la cuenta.
-const RE_IGNORAR = /(total|saldo|vencimiento|pago m[ií]nimo|l[ií]mite de compra|cbu|cuit|c\.u\.i\.t|n[uú]mero de cuenta|estado de cuenta|su pago|pago recibido|pago en pesos|adelanto en efectivo|p[aá]gina \d)/i;
+const RE_CUOTA = /\b(\d{1,2})\s*de\s*(\d{1,2})\b/i;
+// Líneas que nunca son un consumo: totales, vencimientos, datos de la cuenta,
+// y la letra chica del resumen (que trae fechas y montos y confundiría al lector).
+const RE_IGNORAR = /(total|saldo|vencimiento|pago m[ií]nimo|m[ií]nimo a pagar|a pagar|l[ií]mite|cbu|cuit|c\.u\.i\.t|n[uú]mero de cuenta|estado de cuenta|su pago|pago recibido|pago en pesos|adelanto en efectivo|p[aá]gina \d|subtotal|cuotas? de \$|cuotas a vencer|pr[oó]ximas cuotas|tna|tea\b|cftea|plan v:|tasa|per[ií]odo|cierre|copia fiel|t[eé]rminos y condiciones|consumido)/i;
+// A partir de acá empieza la letra chica: dejamos de buscar movimientos.
+const RE_FIN_MOVIMIENTOS = /(t[eé]rminos y condiciones|informaci[oó]n legal|usted puede solicitar)/i;
 
 function anioProbable(dd, mm, aa) {
   if (aa != null) return aa < 100 ? 2000 + aa : aa;
@@ -2683,29 +2694,131 @@ function anioProbable(dd, mm, aa) {
   return a;
 }
 
-function parsearLineas(lineas) {
-  const out = [];
-  lineas.forEach(linea => {
-    const txt = String(linea).replace(/\s+/g, ' ').trim();
-    if (!txt || txt.length < 8 || RE_IGNORAR.test(txt)) return;
-    const mf = txt.match(RE_FECHA);
-    if (!mf) return;
-    const dd = parseInt(mf[1], 10), mm = parseInt(mf[2], 10);
-    if (!(dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12)) return;
-    const montos = (txt.match(RE_MONTO) || []).map(parsearMonto).filter(n => n != null && n !== 0);
-    if (!montos.length) return;
-    // Si hay varias columnas (pesos y dólares), la de pesos es la más grande.
-    const monto = montos.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a);
-    if (monto <= 0) return;                       // pagos y devoluciones no son gastos
-    const anio = anioProbable(dd, mm, mf[3] != null ? parseInt(mf[3], 10) : null);
-    const ultimoDia = new Date(anio, mm, 0).getDate();
-    const fecha = `${anio}-${String(mm).padStart(2, '0')}-${String(Math.min(dd, ultimoDia)).padStart(2, '0')}`;
-    const desc = txt.replace(mf[0], ' ').replace(RE_MONTO, ' ')
-      .replace(/\s+/g, ' ').replace(/^[\s\-*.,|]+|[\s\-*.,|]+$/g, '').trim();
-    if (!desc || desc.length < 3) return;
-    out.push({ fecha, desc: desc.slice(0, 60), monto: Math.round(monto) });
+// Separa los importes de una línea distinguiendo pesos de dólares por su
+// símbolo. Los números entre paréntesis se descartan: en los impuestos son la
+// base del cálculo ("21%( 9394,88) $ 1.972,92"), no lo que te cobran.
+function importesDeLinea(txt, permitirSinSimbolo) {
+  const limpio = txt.replace(/\([^)]*\)/g, ' ');
+  const usd = [], pesos = [];
+  const sinUsd = limpio.replace(/(-?)\s*U\$S\s*(-?[\d.,]+)/gi, (m, signo, n) => {
+    const v = parsearMonto(n);
+    if (v != null) usd.push(signo === '-' ? -Math.abs(v) : v);
+    return ' ';
   });
-  return out;
+  sinUsd.replace(/(-?)\s*\$\s*\$?\s*(-?[\d.,]+)/g, (m, signo, n) => {
+    const v = parsearMonto(n);
+    if (v != null) pesos.push(signo === '-' ? -Math.abs(v) : v);
+    return ' ';
+  });
+  // Hay resúmenes que no marcan la moneda con ningún símbolo. Ahí tomamos los
+  // números con centavos y, si hay varias columnas, la de pesos es la mayor.
+  // Solo se hace en líneas que traen su propia fecha: si no, adivinar números
+  // sueltos levanta basura como la línea de tasas ("En pesos: 77,900 %"), que
+  // se colgaría de la fecha arrastrada de un movimiento anterior.
+  if (permitirSinSimbolo && !pesos.length && !usd.length) {
+    const sueltos = (limpio.match(RE_MONTO) || []).map(parsearMonto).filter(n => n != null && n !== 0);
+    if (sueltos.length) pesos.push(sueltos.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a));
+  }
+  return { pesos: pesos.filter(n => n !== 0), usd: usd.filter(n => n !== 0) };
+}
+
+function limpiarDescripcion(txt, fechaTexto) {
+  return txt
+    .replace(fechaTexto || '', ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/(-?)\s*U\$S\s*-?[\d.,]+/gi, ' ')
+    .replace(/(-?)\s*\$\s*\$?\s*-?[\d.,]+/g, ' ')
+    .replace(RE_CUOTA, ' ')
+    .replace(RE_MONTO, ' ')               // importes sin símbolo de moneda
+    .replace(/\b\d{5,}\b/g, ' ')          // número de comprobante
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s\-*.,|$%]+|[\s\-*.,|$%]+$/g, '')
+    .trim();
+}
+
+// Lee las líneas del resumen. `tc` es el tipo de cambio para pasar a pesos los
+// consumos en dólares; si no hay, esas filas vienen marcadas para que decidas.
+function parsearLineas(lineas, tc) {
+  const crudas = [];
+  let fechaVigente = null, tcDetectado = 0, terminado = false;
+
+  lineas.forEach(linea => {
+    if (terminado) return;
+    const txt = String(linea).replace(/\s+/g, ' ').trim();
+    if (!txt) return;
+    if (RE_FIN_MOVIMIENTOS.test(txt)) { terminado = true; return; }
+    // Algunos resúmenes traen el tipo de cambio que usó el banco ("tc1500,000").
+    const mtc = txt.match(/\btc\s*([\d.,]+)/i);
+    if (mtc) { const v = parsearMonto(mtc[1]); if (v && v > 100) tcDetectado = v; }
+    if (RE_IGNORAR.test(txt)) return;
+
+    // La fecha se arrastra: hay líneas de continuación que no la repiten
+    // (el segundo cargo de Apple del mismo día, por ejemplo).
+    const mf = txt.match(RE_FECHA);
+    if (mf) {
+      const dd = parseInt(mf[1], 10), mm = parseInt(mf[2], 10);
+      if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) {
+        fechaVigente = { dd, mm, aa: mf[3] != null ? parseInt(mf[3], 10) : null, texto: mf[0] };
+      }
+    }
+    if (!fechaVigente) return;   // todavía no arrancó la lista de movimientos
+
+    const { pesos, usd } = importesDeLinea(txt, !!mf);
+    if (!pesos.length && !usd.length) return;
+    const enPesos = pesos.length ? pesos[pesos.length - 1] : null;
+    const enUsd   = !pesos.length && usd.length ? usd[usd.length - 1] : null;
+    const bruto = enPesos != null ? enPesos : enUsd;
+    if (bruto == null || bruto <= 0) return;      // pagos y devoluciones no son gastos
+
+    const desc = limpiarDescripcion(txt, mf ? mf[0] : '');
+    if (!desc || desc.length < 3) return;
+
+    const mc = txt.match(RE_CUOTA);
+    crudas.push({
+      dd: fechaVigente.dd, mm: fechaVigente.mm, aa: fechaVigente.aa,
+      desc: desc.slice(0, 60),
+      enUsd: enPesos == null,
+      bruto,
+      cuota: mc ? { n: parseInt(mc[1], 10), de: parseInt(mc[2], 10) } : null,
+    });
+  });
+
+  // El mes del resumen se deduce del mes más repetido entre los consumos que
+  // NO son cuotas. Las cuotas traen la fecha de la compra original (puede ser
+  // de hace un año) pero te las cobran en ESTE resumen, así que van acá.
+  const conteo = {};
+  crudas.filter(c => !c.cuota).forEach(c => {
+    const a = anioProbable(c.dd, c.mm, c.aa);
+    const k = `${a}-${String(c.mm).padStart(2, '0')}`;
+    conteo[k] = (conteo[k] || 0) + 1;
+  });
+  const mesResumen = Object.keys(conteo).sort((a, b) => conteo[b] - conteo[a])[0] || monthKey();
+  const cambio = tc || tcDetectado || 0;
+  const fuenteTC = tc ? 'tuyo' : (tcDetectado ? 'resumen' : '');
+
+  return crudas.map(c => {
+    let anio, mes, dia;
+    if (c.cuota) {
+      [anio, mes] = mesResumen.split('-').map(Number);
+      dia = Math.min(c.dd, new Date(anio, mes, 0).getDate());
+    } else {
+      anio = anioProbable(c.dd, c.mm, c.aa);
+      mes = c.mm;
+      dia = Math.min(c.dd, new Date(anio, mes, 0).getDate());
+    }
+    const monto = c.enUsd ? Math.round(c.bruto * cambio) : Math.round(c.bruto);
+    return {
+      fecha: `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`,
+      desc: c.desc,
+      monto,
+      enUsd: c.enUsd,
+      usd: c.enUsd ? c.bruto : 0,
+      tcUsado: c.enUsd ? cambio : 0,
+      tcFuente: c.enUsd ? fuenteTC : '',
+      cuota: c.cuota,
+      reubicada: !!c.cuota,
+    };
+  });
 }
 
 let _pdfjs = null;
@@ -2787,7 +2900,7 @@ async function importarArchivo(evt) {
   if (!file) return;
   pantallaImportEstado('Leyendo el PDF…<br><span style="font-size:.75rem">La primera vez descarga el lector, puede tardar unos segundos.</span>');
   try {
-    prepararRevision(parsearLineas(await lineasDelPdf(file)), file.name);
+    prepararRevision(parsearLineas(await lineasDelPdf(file), tc()), file.name);
   } catch (e) {
     const sinNet = /sin internet/.test(e.message || '');
     pantallaImportEstado(`<span class="imp-error">No pude leer ese PDF.</span><br><br>` + (sinNet
@@ -2798,7 +2911,7 @@ async function importarArchivo(evt) {
 function importarTextoPegado() {
   const txt = ($('imp-texto') || {}).value || '';
   if (!txt.trim()) { alert('Pegá primero las líneas de movimientos en el recuadro.'); return; }
-  prepararRevision(parsearLineas(txt.split(/\r?\n/)), 'texto pegado');
+  prepararRevision(parsearLineas(txt.split(/\r?\n/), tc()), 'texto pegado');
 }
 
 function prepararRevision(filas, origen) {
@@ -2814,7 +2927,10 @@ function prepararRevision(filas, origen) {
     const c = categorizar(f.desc);
     const key = monthKey(new Date(f.fecha + 'T00:00:00'));
     const dup = (all[key] || []).some(g => g.fecha === f.fecha && Math.round(g.monto) === f.monto && normTexto(g.nota) === normTexto(f.desc));
-    return { ...f, cat: c.cat, aprendida: c.aprendida, catOriginal: c.cat, dup, usar: !dup };
+    // Un consumo en dólares sin tipo de cambio cargado no se puede convertir:
+    // se muestra igual, pero destildado, para que no entre un monto en cero.
+    const sinTC = f.enUsd && !f.monto;
+    return { ...f, cat: c.cat, aprendida: c.aprendida, catOriginal: c.cat, dup, sinTC, usar: !dup && !sinTC };
   });
   renderRevisionImport(origen);
 }
@@ -2823,12 +2939,21 @@ function renderRevisionImport(origen) {
   const opciones = cat => GASTO_CATS.map(c => `<option value="${c.id}"${c.id === cat ? ' selected' : ''}>${c.label}</option>`).join('');
   const dups = impFilas.filter(f => f.dup).length;
   const reconocidos = impFilas.filter(f => f.cat !== 'otro').length;
+  const cuotas = impFilas.filter(f => f.reubicada).length;
+  const dolares = impFilas.filter(f => f.enUsd).length;
+  const sinTC = impFilas.filter(f => f.sinTC).length;
 
   $('imp-title').textContent = `Revisá antes de importar`;
   $('imp-body').innerHTML = `
     <div class="imp-nota" style="margin:0 0 12px">
       Encontré <b>${impFilas.length} movimiento${impFilas.length > 1 ? 's' : ''}</b> en ${esc(origen)}.
       Le puse categoría a <b>${reconocidos}</b> y el resto quedó en "Otro".
+      ${cuotas ? `<br>🔁 <b>${cuotas}</b> ${cuotas > 1 ? 'son cuotas y las moví' : 'es una cuota y la moví'} al mes de este resumen: figuran con la fecha de la compra original, pero te ${cuotas > 1 ? 'las cobran' : 'la cobran'} ahora.` : ''}
+      ${dolares ? `<br>💵 <b>${dolares}</b> ${dolares > 1 ? 'están' : 'está'} en dólares. ${
+        sinTC ? '<b>No tenés cargado el tipo de cambio</b>, así que no puedo pasarlos a pesos: cargalo más abajo en esta pestaña y volvé a importar.'
+        : impFilas.some(f => f.tcFuente === 'resumen')
+          ? `Los pasé a pesos con el tipo de cambio que venía en el propio resumen (${impFilas.find(f => f.tcFuente === 'resumen').tcUsado}). Si preferís otro, cargalo abajo y volvé a importar.`
+          : 'Los pasé a pesos con el tipo de cambio que tenés cargado.'}` : ''}
       ${dups ? `<br>⚠️ <b>${dups}</b> ya ${dups > 1 ? 'están' : 'está'} cargado${dups > 1 ? 's' : ''} en la app, así que ${dups > 1 ? 'vienen destildados' : 'viene destildado'}.` : ''}
       <br>Corregí lo que haga falta: <b>cada corrección se la voy a recordar</b> para la próxima vez.
     </div>
@@ -2839,7 +2964,7 @@ function renderRevisionImport(origen) {
           <tr class="${f.dup ? 'dup' : ''}">
             <td><input type="checkbox" id="imp-usar-${i}" ${f.usar ? 'checked' : ''} onchange="impFilas[${i}].usar=this.checked;actualizarPieImport()"></td>
             <td class="imp-fecha">${new Date(f.fecha + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</td>
-            <td class="imp-desc">${esc(f.desc)}${f.dup ? '<span class="imp-dup-chip">ya está</span>' : ''}</td>
+            <td class="imp-desc">${esc(f.desc)}${f.dup ? '<span class="imp-dup-chip">ya está</span>' : ''}${f.cuota ? `<span class="imp-cuota-chip">cuota ${f.cuota.n} de ${f.cuota.de}</span>` : ''}${f.enUsd ? `<span class="imp-usd-chip">U$S ${f.usd.toLocaleString('es-AR', { minimumFractionDigits: 2 })}${f.tcUsado ? ` × ${f.tcUsado}` : ' · falta el TC'}</span>` : ''}</td>
             <td><input type="number" min="0" step="1" value="${f.monto}" onchange="impFilas[${i}].monto=Math.round(parseFloat(this.value)||0)"></td>
             <td><select onchange="impFilas[${i}].cat=this.value">${opciones(f.cat)}</select></td>
           </tr>`).join('')}
