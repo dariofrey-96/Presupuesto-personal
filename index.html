@@ -912,6 +912,11 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
 }
 .di-fila:first-of-type { border-top: none; }
 .di-punto { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+/* los tres fondos, colgando de su subtotal */
+.di-fila.hijo { padding: 5px 0 5px 20px; border-top: none; font-size: .74rem; color: var(--muted); }
+.di-fila.hijo .di-punto { width: 6px; height: 6px; }
+.di-fila.hijo .di-monto { font-weight: 600; }
+.di-fila.hijo + .di-fila:not(.hijo) { border-top: 1px solid var(--hairline); margin-top: 3px; }
 .di-nombre { flex: 1; min-width: 0; }
 .di-nombre small { display: block; font-size: .68rem; color: var(--text-3); }
 .di-monto { font-weight: 650; white-space: nowrap; }
@@ -3311,38 +3316,57 @@ function renderResumen() {
 
 // A dónde va el ingreso del período: lo gastado es real, los fondos salen de
 // tu plan (no son categorías de gasto, no se cargan como movimientos).
+// Los tres fondos se muestran por separado: son destinos distintos y conviene
+// ver cuánto va a cada uno, no una bolsa única.
+const FONDOS = [
+  { id: 'fEmergencia',  nom: 'Fondo de emergencia',  col: 'oklch(66% .10 150)' },
+  { id: 'fVacaciones',  nom: 'Fondo de vacaciones',  col: 'oklch(57% .13 150)' },
+  { id: 'fInversiones', nom: 'Fondo de inversiones', col: 'oklch(46% .12 150)' },
+];
+
 function renderDistribucionIngreso(d, p) {
   if (!$('di-barra')) return;
   const ingreso = g('salario') * p.meses;
-  const fondos = (g('fEmergencia') + g('fVacaciones') + g('fInversiones')) * p.meses;
+  const detalleFondos = FONDOS
+    .map(f => ({ nom: f.nom, col: f.col, val: g(f.id) * p.meses }))
+    .filter(f => f.val > 0);
+  const fondos = detalleFondos.reduce((s, f) => s + f.val, 0);
   const gastos = d.total;
   const libre = ingreso - gastos - fondos;
-  const base = Math.max(ingreso, gastos + Math.max(fondos, 0)) || 1;
+  const base = Math.max(ingreso, gastos + fondos) || 1;
 
   $('di-ingreso').textContent = fmtARS(ingreso);
   $('di-ingreso-lbl').textContent = p.meses > 1
     ? `de ingreso en ${p.meses} meses` : `de ingreso en ${monthLabel(d.meses[0])}`;
 
-  const partes = [
-    { nom: 'Gastos', sub: 'lo que cargaste', val: gastos, col: 'oklch(58% .18 25)' },
-    { nom: 'Fondos e inversión', sub: 'según tu plan', val: Math.max(fondos, 0), col: 'oklch(56% .13 150)' },
-    libre >= 0
-      ? { nom: 'Te queda libre', sub: 'sin asignar', val: libre, col: 'oklch(55% .15 264)' }
-      : { nom: 'Te falta', sub: 'gastaste más de lo que entra', val: -libre, col: 'oklch(72% .15 80)', deficit: true },
-  ].filter(x => x.val > 0);
-
-  $('di-barra').innerHTML = partes.filter(x => !x.deficit)
+  // La barra muestra cada fondo como su propio tramo, en tonos de verde.
+  const segmentos = [{ nom: 'Gastos', val: gastos, col: 'oklch(58% .18 25)' }]
+    .concat(detalleFondos)
+    .concat(libre > 0 ? [{ nom: 'Te queda libre', val: libre, col: 'oklch(55% .15 264)' }] : []);
+  $('di-barra').innerHTML = segmentos.filter(x => x.val > 0)
     .map(x => `<span class="di-seg" style="width:${(x.val / base) * 100}%;background:${x.col}" title="${x.nom}: ${fmtARS(x.val)}"></span>`).join('');
 
-  $('di-detalle').innerHTML = ingreso > 0
-    ? partes.map(x => `
-        <div class="di-fila">
-          <span class="di-punto" style="background:${x.col}"></span>
-          <span class="di-nombre">${x.nom}<small>${x.sub}</small></span>
-          <span class="di-monto"${x.deficit ? ' style="color:var(--red-text)"' : ''}>${x.deficit ? '−' : ''}${fmtARS(x.val)}</span>
-          <span class="di-pct">${Math.round((x.val / ingreso) * 100)}%</span>
-        </div>`).join('')
-    : `<div class="rs-vacio">Cargá tu salario en Ajustes y acá vas a ver cómo se reparte tu ingreso.</div>`;
+  if (!(ingreso > 0)) {
+    $('di-detalle').innerHTML = `<div class="rs-vacio">Cargá tu salario en Ajustes y acá vas a ver cómo se reparte tu ingreso.</div>`;
+    return;
+  }
+  const fila = (x) => `
+    <div class="di-fila${x.hijo ? ' hijo' : ''}">
+      <span class="di-punto" style="background:${x.col}"></span>
+      <span class="di-nombre">${x.nom}${x.sub ? `<small>${x.sub}</small>` : ''}</span>
+      <span class="di-monto"${x.rojo ? ' style="color:var(--red-text)"' : ''}>${x.rojo ? '−' : ''}${fmtARS(x.val)}</span>
+      <span class="di-pct">${Math.round((x.val / ingreso) * 100)}%</span>
+    </div>`;
+
+  const filas = [];
+  if (gastos > 0) filas.push(fila({ nom: 'Gastos', sub: 'lo que cargaste', val: gastos, col: 'oklch(58% .18 25)' }));
+  if (fondos > 0) {
+    filas.push(fila({ nom: 'Fondos e inversión', sub: 'según tu plan', val: fondos, col: 'oklch(56% .13 150)' }));
+    detalleFondos.forEach(f => filas.push(fila({ nom: f.nom, val: f.val, col: f.col, hijo: true })));
+  }
+  if (libre >= 0) filas.push(fila({ nom: 'Te queda libre', sub: 'sin asignar', val: libre, col: 'oklch(55% .15 264)' }));
+  else filas.push(fila({ nom: 'Te falta', sub: 'gastaste más de lo que entra', val: -libre, col: 'oklch(72% .15 80)', rojo: true }));
+  $('di-detalle').innerHTML = filas.join('');
 }
 
 // El gráfico siempre muestra los últimos 12 meses: es la foto larga, no
