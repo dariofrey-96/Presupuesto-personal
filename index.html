@@ -3499,9 +3499,12 @@ renderInicio();
 const LS_THEME = 'presupuesto_theme';
 
 function updateChartColors(theme) {
-  const tick = theme === 'dark' ? '#86817b' : '#9d9a95';
-  const grid = theme === 'dark' ? 'rgba(247,246,244,.08)' : 'rgba(26,26,24,.08)';
-  const border = theme === 'dark' ? '#3a383e' : '#e7e4e0';
+  const oscuro = theme === 'dark';
+  const tick = oscuro ? '#86817b' : '#9d9a95';
+  const grid = oscuro ? 'rgba(247,246,244,.08)' : 'rgba(26,26,24,.08)';
+  const border = oscuro ? '#3a383e' : '#e7e4e0';
+  const fondoTt = oscuro ? '#29282d' : '#ffffff';
+  const textoTt = oscuro ? '#f2f0ec' : '#1a1a18';
   [chartProy, chartHist].forEach(ch => {
     if (!ch) return;
     ['x', 'y'].forEach(ax => {
@@ -3511,6 +3514,15 @@ function updateChartColors(theme) {
       if (s.grid) s.grid.color = grid;
       if (s.border) s.border.color = border;
     });
+    // El globito del gráfico también tiene que seguir el tema: quedaba blanco
+    // sobre fondo oscuro porque sus colores estaban fijos en el modo claro.
+    const tt = ch.options.plugins && ch.options.plugins.tooltip;
+    if (tt) {
+      tt.backgroundColor = fondoTt;
+      tt.borderColor = border;
+      tt.titleColor = tick;
+      tt.bodyColor = textoTt;
+    }
     ch.update();
   });
 }
@@ -3533,6 +3545,55 @@ function toggleTheme() {
 
 // sincroniza el ícono/label y los colores del gráfico con el tema ya aplicado en <head>
 applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+
+// ── DESLIZAR CON EL DEDO PARA CAMBIAR DE PESTAÑA ──────────────────────────
+// Mismo gesto que en el Plan de Retiro: arrastrás el dedo horizontalmente y
+// pasás a la sección de al lado, en el orden de la barra de abajo.
+const SECCIONES = ['inicio', 'presupuesto', 'gastos', 'historico', 'proyeccion'];
+const MIN_DESPLAZAMIENTO = 60;   // px — evita disparar con toques temblorosos
+const MODALES = ['alerta-modal', 'imp-modal'];
+
+// Zonas donde el gesto no debe robarle el toque a otra cosa.
+function gestoBloqueado(el) {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    if (n.tagName === 'CANVAS' || n.tagName === 'SELECT' || n.tagName === 'TEXTAREA') return true;
+    if (n.tagName === 'INPUT') return true;          // sliders, montos, fechas
+    if (n.id === 'aside') return true;               // el panel de ajustes tiene lo suyo
+    const est = getComputedStyle(n);
+    if ((est.overflowX === 'auto' || est.overflowX === 'scroll') && n.scrollWidth > n.clientWidth + 4) return true;
+  }
+  return false;
+}
+function hayAlgoAbierto() {
+  const a = $('aside');
+  if (a && a.classList.contains('open')) return true;
+  return MODALES.some(id => { const m = $(id); return m && m.classList.contains('open'); });
+}
+
+(function () {
+  let x0 = null, y0 = null, valido = false;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || hayAlgoAbierto()) { valido = false; return; }
+    x0 = e.touches[0].clientX;
+    y0 = e.touches[0].clientY;
+    valido = !gestoBloqueado(e.target);
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!valido || x0 == null) return;
+    valido = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    // Tiene que ser claramente horizontal, si no se confunde con el scroll.
+    if (Math.abs(dx) < MIN_DESPLAZAMIENTO || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const idx = SECCIONES.indexOf(currentTab);
+    if (idx < 0) return;
+    const destino = SECCIONES[dx < 0 ? idx + 1 : idx - 1];   // ← siguiente, → anterior
+    if (!destino) return;
+    setTab(destino);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, { passive: true });
+})();
 
 // ── TOOLTIP TÁCTIL EN LA BARRA DE DISTRIBUCIÓN (el CSS ya cubre el :hover de mouse) ──
 const distBarEl = $('dist-bar');

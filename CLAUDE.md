@@ -119,6 +119,15 @@ Sección `── IMPORTAR RESUMEN ──`, modal `#imp-modal`, botón en el form
 
 **Pendiente de afinar con un resumen real del usuario** — el lector se probó con formatos sintéticos (Galicia/Santander/Mercado Pago) y con un PDF generado a mano, no con uno suyo. Al 2026-08-14 todavía no lo mandó.
 
+### Paridad con Plan de Retiro (revisado 2026-08-14)
+
+El usuario preguntó si acá estaban los cambios que se habían hecho en el repo hermano. **No se traspasan solos entre conversaciones**: hay que ir a leer `Plan-retiro-dashboard/index.html`. De esa comparación salió:
+
+- ✅ **Deslizar con el dedo para cambiar de pestaña** — portado el 2026-08-14. `SECCIONES = ['inicio','presupuesto','gastos','historico','proyeccion']`, umbral de 60px, y exige que el gesto sea claramente horizontal (`|dx| > |dy| * 1.5`). `gestoBloqueado()` lo desactiva sobre canvas, inputs, selects, textareas, el sidebar y cualquier contenedor con scroll horizontal (la tira de KPIs y las tablas). `hayAlgoAbierto()` lo desactiva con el sidebar o un modal abierto. Allá usaban `.active`; acá las vistas se muestran con `style.display` y se llama a `setTab()` directo.
+- ✅ **Tooltip del gráfico en modo oscuro** — arreglado el 2026-08-14. Los colores del globito estaban fijos en modo claro y `updateChartColors()` solo tocaba ejes y grilla, así que en oscuro quedaba blanco. En el repo hermano esto no pasa porque leen variables CSS con `getCSSVar()`.
+- ⏳ **Haptics** (vibración al mover sliders, `navigator.vibrate` + switch nativo en iOS) — existe en Plan de Retiro (`hapticTick()`, ~línea 1435), **no está acá**. Pendiente de decisión del usuario.
+- ⏳ **Bottom sheet con swipe-to-dismiss** (arrastrar el panel de ajustes hacia abajo para cerrarlo) — existe en Plan de Retiro (~línea 1490), **no está acá**. Pendiente de decisión del usuario.
+
 ## Ideas pendientes
 
 Confirmadas por el usuario (2026-08-07). Las tres primeras ya están hechas:
