@@ -896,22 +896,26 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
 .rs-cat-pct { font-size: .68rem; color: var(--text-3); font-weight: 700; width: 32px; text-align: right; }
 .rs-vacio { font-size: .8rem; color: var(--muted); line-height: 1.55; text-align: center; padding: 14px 0; }
 
-/* distribución del ingreso: cascada, se lee como un resumen de cuenta */
-.di-fila { padding: 11px 0 0; }
-.di-fila:first-of-type { padding-top: 2px; }
-.di-fila-top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; font-size: .8rem; }
-.di-nombre { flex: 1; min-width: 0; line-height: 1.25; }
-.di-nombre small { display: block; font-size: .66rem; color: var(--text-3); font-weight: 400; }
+/* distribución del ingreso */
+.di-top { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.di-ingreso { font-size: 1.55rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.di-ingreso-lbl { font-size: .76rem; color: var(--muted); }
+.di-barra {
+  display: flex; height: 16px; border-radius: 99px; overflow: hidden;
+  background: var(--surface-3); margin-bottom: 14px;
+}
+.di-seg { height: 100%; transition: width .3s ease; }
+.di-seg + .di-seg { border-left: 2px solid var(--surface); }
+.di-fila {
+  display: flex; align-items: center; gap: 9px; padding: 8px 0;
+  border-top: 1px solid var(--hairline); font-size: .8rem;
+}
+.di-fila:first-of-type { border-top: none; }
+.di-punto { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.di-nombre { flex: 1; min-width: 0; }
+.di-nombre small { display: block; font-size: .68rem; color: var(--text-3); }
 .di-monto { font-weight: 650; white-space: nowrap; }
-.di-pct { font-size: .68rem; color: var(--text-3); font-weight: 700; width: 32px; text-align: right; }
-.di-barra { height: 9px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
-.di-fill { height: 100%; border-radius: 99px; transition: width .3s ease; }
-.di-sep { border-top: 1px solid var(--divider); margin-top: 14px; }
-.di-fila.total .di-nombre { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: .7rem; }
-.di-fila.total .di-monto { font-size: 1.1rem; }
-.di-fila.total .di-barra { height: 11px; }
-.di-fila.ingreso .di-nombre { font-weight: 650; }
-.di-fila.ingreso .di-monto { font-size: 1.1rem; }
+.di-pct { font-size: .68rem; color: var(--text-3); font-weight: 700; width: 34px; text-align: right; }
 
 /* dona de categorías */
 .rs-donut-wrap { position: relative; height: 190px; margin: 4px 0 14px; }
@@ -1765,8 +1769,13 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
           <div class="rs-chips" id="rs-chips"></div>
 
           <div class="ini-card">
-            <div class="ini-card-hdr" id="di-hdr">A dónde va tu ingreso</div>
-            <div id="di-cascada"></div>
+            <div class="ini-card-hdr">A dónde va tu ingreso</div>
+            <div class="di-top">
+              <span class="di-ingreso" id="di-ingreso">$0</span>
+              <span class="di-ingreso-lbl" id="di-ingreso-lbl">de ingreso</span>
+            </div>
+            <div class="di-barra" id="di-barra"></div>
+            <div id="di-detalle"></div>
           </div>
 
           <div class="ini-card">
@@ -3301,46 +3310,37 @@ function renderResumen() {
 // A dónde va el ingreso del período: lo gastado es real, los fondos salen de
 // tu plan (no son categorías de gasto, no se cargan como movimientos).
 function renderDistribucionIngreso(d, p) {
-  if (!$('di-cascada')) return;
+  if (!$('di-barra')) return;
   const ingreso = g('salario') * p.meses;
-  const fondos = Math.max((g('fEmergencia') + g('fVacaciones') + g('fInversiones')) * p.meses, 0);
+  const fondos = (g('fEmergencia') + g('fVacaciones') + g('fInversiones')) * p.meses;
   const gastos = d.total;
   const libre = ingreso - gastos - fondos;
-  // Todas las barras se miden contra el mismo tope, así se comparan de un vistazo.
-  const base = Math.max(ingreso, gastos + fondos) || 1;
+  const base = Math.max(ingreso, gastos + Math.max(fondos, 0)) || 1;
 
-  $('di-hdr').textContent = p.meses > 1
-    ? `A dónde va tu ingreso · ${p.label.toLowerCase()}`
-    : `A dónde va tu ingreso · ${monthLabel(d.meses[0])}`;
+  $('di-ingreso').textContent = fmtARS(ingreso);
+  $('di-ingreso-lbl').textContent = p.meses > 1
+    ? `de ingreso en ${p.meses} meses` : `de ingreso en ${monthLabel(d.meses[0])}`;
 
-  if (!(ingreso > 0)) {
-    $('di-cascada').innerHTML = `<div class="rs-vacio">Cargá tu salario en Ajustes y acá vas a ver cómo se reparte tu ingreso.</div>`;
-    return;
-  }
+  const partes = [
+    { nom: 'Gastos', sub: 'lo que cargaste', val: gastos, col: 'oklch(58% .18 25)' },
+    { nom: 'Fondos e inversión', sub: 'según tu plan', val: Math.max(fondos, 0), col: 'oklch(56% .13 150)' },
+    libre >= 0
+      ? { nom: 'Te queda libre', sub: 'sin asignar', val: libre, col: 'oklch(55% .15 264)' }
+      : { nom: 'Te falta', sub: 'gastaste más de lo que entra', val: -libre, col: 'oklch(72% .15 80)', deficit: true },
+  ].filter(x => x.val > 0);
 
-  const fila = (x) => `
-    <div class="di-fila${x.clase ? ' ' + x.clase : ''}">
-      <div class="di-fila-top">
-        <span class="di-nombre">${x.nom}${x.sub ? `<small>${x.sub}</small>` : ''}</span>
-        <span class="di-monto"${x.rojo ? ' style="color:var(--red-text)"' : ''}>${x.signo || ''}${fmtARS(x.val)}</span>
-        <span class="di-pct">${x.pct == null ? '' : Math.round(x.pct * 100) + '%'}</span>
-      </div>
-      <div class="di-barra"><span class="di-fill" style="width:${Math.min(x.val / base, 1) * 100}%;background:${x.col}"></span></div>
-    </div>`;
+  $('di-barra').innerHTML = partes.filter(x => !x.deficit)
+    .map(x => `<span class="di-seg" style="width:${(x.val / base) * 100}%;background:${x.col}" title="${x.nom}: ${fmtARS(x.val)}"></span>`).join('');
 
-  const filas = [
-    fila({ nom: 'Ingreso', val: ingreso, col: 'oklch(55% .15 264)', clase: 'ingreso' }),
-    fila({ nom: 'Gastos', sub: 'lo que cargaste', val: gastos, col: 'oklch(58% .18 25)', pct: gastos / ingreso, signo: '−' }),
-  ];
-  if (fondos > 0) {
-    filas.push(fila({ nom: 'Fondos e inversión', sub: 'según tu plan', val: fondos, col: 'oklch(56% .13 150)', pct: fondos / ingreso, signo: '−' }));
-  }
-  filas.push('<div class="di-sep"></div>');
-  filas.push(libre >= 0
-    ? fila({ nom: 'Te queda libre', val: libre, col: 'oklch(55% .15 264)', pct: libre / ingreso, clase: 'total' })
-    : fila({ nom: 'Te falta', sub: 'gastaste más de lo que entra', val: -libre, col: 'oklch(58% .18 25)', pct: -libre / ingreso, clase: 'total', rojo: true, signo: '−' }));
-
-  $('di-cascada').innerHTML = filas.join('');
+  $('di-detalle').innerHTML = ingreso > 0
+    ? partes.map(x => `
+        <div class="di-fila">
+          <span class="di-punto" style="background:${x.col}"></span>
+          <span class="di-nombre">${x.nom}<small>${x.sub}</small></span>
+          <span class="di-monto"${x.deficit ? ' style="color:var(--red-text)"' : ''}>${x.deficit ? '−' : ''}${fmtARS(x.val)}</span>
+          <span class="di-pct">${Math.round((x.val / ingreso) * 100)}%</span>
+        </div>`).join('')
+    : `<div class="rs-vacio">Cargá tu salario en Ajustes y acá vas a ver cómo se reparte tu ingreso.</div>`;
 }
 
 // El gráfico siempre muestra los últimos 12 meses: es la foto larga, no
