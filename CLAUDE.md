@@ -112,7 +112,12 @@ Cuatro bloques: gastado de la semana con comparación contra la semana anterior 
 - La barra inferior pasó de 5 a 6 ítems; se acortaron labels ("Presup.", "Histór.", "Proyec.") y se bajó el padding. Verificado: entran a 375px sin cortarse.
 - Estados vacíos cubiertos: sin gastos, y sin presupuesto definido (ahí no da veredicto, invita a definirlo).
 
-**Nota para verificar en el navegador**: si el panel de preview no está compositando, las transiciones CSS quedan congeladas y `getComputedStyle` del `body` devuelve el color viejo al cambiar de tema. No es un bug — desactivar `transition` para medir.
+**Nota para verificar en el navegador**: si el panel de preview no está compositando, **`requestAnimationFrame` nunca corre**. Consecuencias al medir:
+
+- Las transiciones CSS quedan congeladas y `getComputedStyle` del `body` devuelve el color viejo al cambiar de tema.
+- **Los gráficos de Chart.js calculan la geometría pero no se pintan**: `getImageData` da 0% de área dibujada. Una dona se ve especialmente afectada porque todo su barrido está animado. Para medir de verdad: `chart.options.animation = false; chart.update('none'); chart.draw();` y recién ahí leer los píxeles.
+
+Nada de esto es un bug de la app — en un navegador real anda.
 
 ### Importar resumen de tarjeta / billetera (implementado 2026-08-14)
 

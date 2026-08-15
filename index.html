@@ -895,6 +895,37 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
 .rs-cat-monto { font-weight: 650; white-space: nowrap; text-align: right; min-width: 60px; }
 .rs-cat-pct { font-size: .68rem; color: var(--text-3); font-weight: 700; width: 32px; text-align: right; }
 .rs-vacio { font-size: .8rem; color: var(--muted); line-height: 1.55; text-align: center; padding: 14px 0; }
+
+/* distribución del ingreso */
+.di-top { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.di-ingreso { font-size: 1.55rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.di-ingreso-lbl { font-size: .76rem; color: var(--muted); }
+.di-barra {
+  display: flex; height: 16px; border-radius: 99px; overflow: hidden;
+  background: var(--surface-3); margin-bottom: 14px;
+}
+.di-seg { height: 100%; transition: width .3s ease; }
+.di-seg + .di-seg { border-left: 2px solid var(--surface); }
+.di-fila {
+  display: flex; align-items: center; gap: 9px; padding: 8px 0;
+  border-top: 1px solid var(--hairline); font-size: .8rem;
+}
+.di-fila:first-of-type { border-top: none; }
+.di-punto { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.di-nombre { flex: 1; min-width: 0; }
+.di-nombre small { display: block; font-size: .68rem; color: var(--text-3); }
+.di-monto { font-weight: 650; white-space: nowrap; }
+.di-pct { font-size: .68rem; color: var(--text-3); font-weight: 700; width: 34px; text-align: right; }
+
+/* dona de categorías */
+.rs-donut-wrap { position: relative; height: 190px; margin: 4px 0 14px; }
+.rs-donut-centro {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none; gap: 1px;
+}
+.rs-donut-num { font-size: 1.15rem; font-weight: 700; letter-spacing: -.01em; }
+.rs-donut-cap { font-size: .64rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.rs-cat-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 </style>
 <script>
 // Aplica el tema guardado ANTES de pintar, para evitar el flash de tema incorrecto.
@@ -916,8 +947,8 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
     <span class="sub">ARS · mensual</span>
   </div>
   <div class="tabs">
-    <button class="tab active" data-tab="gastos" onclick="setTab('gastos')">Gastos</button>
-    <button class="tab" data-tab="resumen" onclick="setTab('resumen')">Resumen</button>
+    <button class="tab active" data-tab="resumen" onclick="setTab('resumen')">Resumen</button>
+    <button class="tab" data-tab="gastos" onclick="setTab('gastos')">Gastos</button>
   </div>
   <div class="header-right">
     <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">⚙ Parámetros</button>
@@ -1738,6 +1769,16 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
           <div class="rs-chips" id="rs-chips"></div>
 
           <div class="ini-card">
+            <div class="ini-card-hdr">A dónde va tu ingreso</div>
+            <div class="di-top">
+              <span class="di-ingreso" id="di-ingreso">$0</span>
+              <span class="di-ingreso-lbl" id="di-ingreso-lbl">de ingreso</span>
+            </div>
+            <div class="di-barra" id="di-barra"></div>
+            <div id="di-detalle"></div>
+          </div>
+
+          <div class="ini-card">
             <div class="ini-hero-label" id="rs-label">Gastado</div>
             <div class="ini-hero-val" id="rs-total">$0</div>
             <div class="ini-hero-sub" id="rs-sub"></div>
@@ -1750,6 +1791,13 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
 
           <div class="ini-card">
             <div class="ini-card-hdr" id="rs-cats-hdr">En qué se te va</div>
+            <div class="rs-donut-wrap">
+              <canvas id="chart-cats"></canvas>
+              <div class="rs-donut-centro">
+                <span class="rs-donut-num" id="rs-donut-num">$0</span>
+                <span class="rs-donut-cap" id="rs-donut-cap">en total</span>
+              </div>
+            </div>
             <div id="rs-cats"></div>
           </div>
         </div>
@@ -1841,7 +1889,7 @@ function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
 function fmtPctInt(n) { return Math.round(n * 100) + '%'; }
 
 // ── TABS ─────────────────────────────────────────────────────────────────
-let currentTab = 'gastos';
+let currentTab = 'resumen';
 function toggleSidebar() {
   const a = $('aside'), backdrop = $('sheet-backdrop'), open = a.classList.toggle('open');
   backdrop.classList.toggle('open', open);
@@ -1987,11 +2035,35 @@ const chartRes = ctxRes ? new Chart(ctxRes, {
       }
     },
     scales: {
-      x: { ticks: { color: '#9d9a95', font: { size: 10 } }, grid: { display: false }, border: { color: '#e7e4e0' } },
+      x: { ticks: { color: '#9d9a95', font: { size: 10 }, maxTicksLimit: 12 }, grid: { color: 'rgba(128,128,128,.12)' }, border: { color: '#e7e4e0' } },
       y: {
         beginAtZero: true,
         ticks: { color: '#9d9a95', font: { size: 10 }, callback: v => fmtARS(v) },
-        grid: { color: 'rgba(26,26,24,.08)' }, border: { display: false }
+        grid: { color: 'rgba(128,128,128,.12)' }, border: { color: '#e7e4e0' }
+      }
+    }
+  }
+}) : null;
+
+// Dona de proporciones por categoría, con el mismo look que las del Plan de Retiro.
+const ctxCats = $('chart-cats') ? $('chart-cats').getContext('2d') : null;
+const chartCats = ctxCats ? new Chart(ctxCats, {
+  type: 'doughnut',
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0, hoverOffset: 5 }] },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '72%',
+    animation: { duration: 200 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#ffffff', borderColor: '#e7e4e0', borderWidth: 1,
+        titleColor: '#9d9a95', bodyColor: '#1a1a18', padding: 10,
+        callbacks: {
+          label: c => {
+            const tot = c.dataset.data.reduce((s, n) => s + n, 0) || 1;
+            return ` ${c.label}: ${fmtARS(c.parsed)} (${Math.round((c.parsed / tot) * 100)}%)`;
+          }
+        }
       }
     }
   }
@@ -3146,6 +3218,13 @@ const PERIODOS = [
   { id: 'doce',   label: 'Últimos 12 meses',  meses: 12, atras: 0 },
 ];
 let periodoActivo = 'mes';
+// Paleta propia, equivalente a la del Plan de Retiro pero con los colores de
+// esta app, para que se lea bien en claro y en oscuro.
+const PALETA_CATS = [
+  'oklch(58% .18 25)', 'oklch(55% .15 264)', 'oklch(56% .13 150)', 'oklch(72% .15 80)',
+  'oklch(52% .16 300)', 'oklch(58% .12 175)', 'oklch(62% .15 350)', 'oklch(60% .13 130)',
+  'oklch(55% .11 210)', 'oklch(50% .05 264)',
+];
 
 function mesesHaciaAtras(cantidad, saltando) {
   const hoy = new Date(), out = [];
@@ -3178,6 +3257,10 @@ function datosPeriodo(p) {
 
 function renderResumen() {
   if (!$('rs-total')) return;
+  // Los gráficos se crean con la pestaña oculta, así que arrancan midiendo 0.
+  // Al mostrarla hay que pedirles que se vuelvan a medir.
+  if (chartRes) chartRes.resize();
+  if (chartCats) chartCats.resize();
   const p = PERIODOS.find(x => x.id === periodoActivo) || PERIODOS[0];
   const d = datosPeriodo(p);
 
@@ -3198,21 +3281,66 @@ function renderResumen() {
   partes.push(`${d.gastos.length} movimiento${d.gastos.length === 1 ? '' : 's'}`);
   $('rs-sub').innerHTML = d.total > 0 ? partes.join(' · ') : 'No hay gastos cargados en este período.';
 
-  // ── Desglose por categoría ──
+  renderDistribucionIngreso(d, p);
+
+  // ── Desglose por categoría: la dona da la proporción, la lista los números ──
   const filas = Object.entries(d.porCat).sort((a, b) => b[1] - a[1]);
-  const maxCat = filas.length ? filas[0][1] : 1;
   $('rs-cats-hdr').textContent = `En qué se te va${p.meses > 1 ? ` · ${p.label.toLowerCase()}` : ''}`;
   $('rs-cats').innerHTML = filas.length
-    ? filas.map(([id, monto]) => `
+    ? filas.map(([id, monto], i) => `
         <div class="rs-cat">
+          <span class="rs-cat-dot" style="background:${PALETA_CATS[i % PALETA_CATS.length]}"></span>
           <span class="rs-cat-name">${esc(catLabel(id))}</span>
-          <span class="rs-cat-barra"><span class="rs-cat-fill" style="width:${(monto / maxCat) * 100}%"></span></span>
           <span class="rs-cat-monto">${fmtARS(monto)}</span>
           <span class="rs-cat-pct">${d.total > 0 ? Math.round((monto / d.total) * 100) : 0}%</span>
         </div>`).join('')
     : `<div class="rs-vacio">Cuando cargues gastos, acá vas a ver en qué se te va la plata, ordenado de mayor a menor.</div>`;
 
+  $('rs-donut-num').textContent = fmtARS(d.total);
+  $('rs-donut-cap').textContent = filas.length ? `en ${filas.length} rubro${filas.length > 1 ? 's' : ''}` : 'sin datos';
+  if (chartCats) {
+    chartCats.data.labels = filas.map(([id]) => catLabel(id));
+    chartCats.data.datasets[0].data = filas.map(([, m]) => m);
+    chartCats.data.datasets[0].backgroundColor = filas.map((_, i) => PALETA_CATS[i % PALETA_CATS.length]);
+    chartCats.update();
+  }
   pintarGraficoResumen();
+}
+
+// A dónde va el ingreso del período: lo gastado es real, los fondos salen de
+// tu plan (no son categorías de gasto, no se cargan como movimientos).
+function renderDistribucionIngreso(d, p) {
+  if (!$('di-barra')) return;
+  const ingreso = g('salario') * p.meses;
+  const fondos = (g('fEmergencia') + g('fVacaciones') + g('fInversiones')) * p.meses;
+  const gastos = d.total;
+  const libre = ingreso - gastos - fondos;
+  const base = Math.max(ingreso, gastos + Math.max(fondos, 0)) || 1;
+
+  $('di-ingreso').textContent = fmtARS(ingreso);
+  $('di-ingreso-lbl').textContent = p.meses > 1
+    ? `de ingreso en ${p.meses} meses` : `de ingreso en ${monthLabel(d.meses[0])}`;
+
+  const partes = [
+    { nom: 'Gastos', sub: 'lo que cargaste', val: gastos, col: 'oklch(58% .18 25)' },
+    { nom: 'Fondos e inversión', sub: 'según tu plan', val: Math.max(fondos, 0), col: 'oklch(56% .13 150)' },
+    libre >= 0
+      ? { nom: 'Te queda libre', sub: 'sin asignar', val: libre, col: 'oklch(55% .15 264)' }
+      : { nom: 'Te falta', sub: 'gastaste más de lo que entra', val: -libre, col: 'oklch(72% .15 80)', deficit: true },
+  ].filter(x => x.val > 0);
+
+  $('di-barra').innerHTML = partes.filter(x => !x.deficit)
+    .map(x => `<span class="di-seg" style="width:${(x.val / base) * 100}%;background:${x.col}" title="${x.nom}: ${fmtARS(x.val)}"></span>`).join('');
+
+  $('di-detalle').innerHTML = ingreso > 0
+    ? partes.map(x => `
+        <div class="di-fila">
+          <span class="di-punto" style="background:${x.col}"></span>
+          <span class="di-nombre">${x.nom}<small>${x.sub}</small></span>
+          <span class="di-monto"${x.deficit ? ' style="color:var(--red-text)"' : ''}>${x.deficit ? '−' : ''}${fmtARS(x.val)}</span>
+          <span class="di-pct">${Math.round((x.val / ingreso) * 100)}%</span>
+        </div>`).join('')
+    : `<div class="rs-vacio">Cargá tu salario en Ajustes y acá vas a ver cómo se reparte tu ingreso.</div>`;
 }
 
 // El gráfico siempre muestra los últimos 12 meses: es la foto larga, no
@@ -3229,8 +3357,10 @@ function pintarGraficoResumen() {
     label: 'Gastado',
     data: meses.map(k => totalDelMes(all, k)),
     borderColor: 'oklch(58% .18 25)',
-    backgroundColor: 'oklch(58% .18 25 / .10)',
-    borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5, fill: true, tension: 0.25,
+    backgroundColor: 'oklch(58% .18 25 / .07)',
+    // Mismo estilo que el gráfico del Plan de Retiro: línea suave, sin puntos
+    // hasta que la tocás.
+    borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, fill: true, tension: 0.3,
   }];
   chartRes.update();
 }
@@ -3838,12 +3968,12 @@ $('gasto-fecha').value = new Date().toISOString().slice(0, 10);
 loadTC();
 $('tipoCambio').addEventListener('input', () => { saveTC(); updateRetiroPreview(); });
 recalc();
-setTab('gastos');   // deja la vista correcta visible y pinta todo
+setTab('resumen');   // deja la vista correcta visible y pinta todo
 </script>
 
 <nav class="bottom-nav" id="bottom-nav">
-  <button class="bn-item active" data-tab="gastos" onclick="setTab('gastos')"><span class="bn-ic">＋</span>Gastos</button>
-  <button class="bn-item" data-tab="resumen" onclick="setTab('resumen')"><span class="bn-ic">◔</span>Resumen</button>
+  <button class="bn-item active" data-tab="resumen" onclick="setTab('resumen')"><span class="bn-ic">◔</span>Resumen</button>
+  <button class="bn-item" data-tab="gastos" onclick="setTab('gastos')"><span class="bn-ic">＋</span>Gastos</button>
   <button class="bn-item" onclick="toggleSidebar()"><span class="bn-ic">⚙</span>Ajustes</button>
 </nav>
 
@@ -3858,10 +3988,10 @@ function updateChartColors(theme) {
   const border = oscuro ? '#3a383e' : '#e7e4e0';
   const fondoTt = oscuro ? '#29282d' : '#ffffff';
   const textoTt = oscuro ? '#f2f0ec' : '#1a1a18';
-  [chartProy, chartHist, chartRes].forEach(ch => {
+  [chartProy, chartHist, chartRes, chartCats].forEach(ch => {
     if (!ch) return;
     ['x', 'y'].forEach(ax => {
-      const s = ch.options.scales[ax];
+      const s = ch.options.scales && ch.options.scales[ax];   // la dona no tiene ejes
       if (!s) return;
       if (s.ticks) s.ticks.color = tick;
       if (s.grid) s.grid.color = grid;
@@ -3902,7 +4032,7 @@ applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dar
 // ── DESLIZAR CON EL DEDO PARA CAMBIAR DE PESTAÑA ──────────────────────────
 // Mismo gesto que en el Plan de Retiro: arrastrás el dedo horizontalmente y
 // pasás a la sección de al lado, en el orden de la barra de abajo.
-const SECCIONES = ['gastos', 'resumen'];
+const SECCIONES = ['resumen', 'gastos'];
 const MIN_DESPLAZAMIENTO = 60;   // px — evita disparar con toques temblorosos
 const MODALES = ['alerta-modal', 'imp-modal'];
 
