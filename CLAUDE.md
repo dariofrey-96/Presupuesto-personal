@@ -16,6 +16,24 @@ Dos apps hermanas (HTML/JS, hosteadas en GitHub Pages), mismo sistema de diseño
 
 **Visión a futuro**: una sola app unificada con cuentas de usuario (login), que junte presupuesto e inversiones, pensada para gente que no sabe de finanzas ni es organizada. Decisión del usuario: **es la meta final pero no es urgente** — por ahora se sigue mejorando cada app standalone. No construir login/backend salvo pedido explícito, pero evitar decisiones que compliquen esa unión más adelante.
 
+### Objetivo comercial (declarado 2026-08-16)
+
+El usuario **quiere monetizar esto**: que otras personas se lo descarguen y pagar por ello. Consultó con otra IA sobre qué debería tener una app así y trajo una lista (conciliación bancaria, Open Finance, MFA/FIDO2, Zero Trust, AES-256, HSM, DORA). Postura acordada:
+
+- **La lista de seguridad describe cómo proteger un servidor, y esta app no tiene servidor.** Hoy es más privada que cualquier fintech porque no hay nada que hackear. Seguir esa lista implicaría construir el backend primero — o sea, crear el riesgo y después defenderlo. Todo eso pasa a ser obligatorio **solo si** se convierte en producto multiusuario (ahí además aplica la ley argentina de datos personales 25.326).
+- **Los riesgos reales de hoy son otros**: si limpia el navegador sin exportar el backup pierde todo, y cualquiera con acceso a su compu ve los datos.
+- **Open Finance / conexión al banco no es viable en Argentina** para un proyecto personal. El lector de PDF no es un plan B: es *la* solución local.
+- **Diferencial real frente a Fintonic/YNAB/Mobills**: entender cuotas argentinas ("8 de 10" reubicada al mes del resumen), pagos por trimestre, inflación y dualidad peso/dólar.
+- **Consejo dado**: la app ya está publicada y es gratis de mantener. Validar con 10-20 personas reales antes de invertir en backend; el orden inverso es el error caro más común. Aclarado que esto no es asesoramiento de negocios y que no se puede predecir el éxito comercial.
+
+### Diseño del presupuesto en dos momentos (acordado 2026-08-16, pendiente de implementar)
+
+El usuario detectó un agujero real: **"sugerir montos según lo que gastás" no sirve el primer día**, porque no hay historial. Preguntó quién define las categorías y los montos para alguien que recién se descarga la app. Diseño acordado:
+
+1. **Definir** (lo pone la persona, guiada): onboarding corto al abrir sin datos — cuánto entra por mes → qué categorías usa (marca de la lista) → cuánto en cada una. Solo se muestran las categorías marcadas; el resto no existe para esa persona.
+2. **Ajustar** (lo propone la app, con datos): después de 1-2 meses cargados, sugerir subir/bajar el presupuesto de un rubro según el gasto real. **Nunca cambia solo, siempre pregunta.**
+3. **Atajo de arranque**: importar el último resumen de tarjeta durante el onboarding y armar el presupuesto con lo gastado de verdad, para no partir de una pantalla en blanco.
+
 ## Este repo (Presupuesto Personal)
 
 App de una sola página en pesos argentinos. Todo vive en `index.html` (~2200 líneas, HTML + CSS + JS en el mismo archivo). El repo solo tiene `README.md` e `index.html` — sin build, sin dependencias, sin backend, sin GitHub Actions.
@@ -29,6 +47,24 @@ App de una sola página en pesos argentinos. Todo vive en `index.html` (~2200 l�
 - **Siguen usando `monthKey()` a propósito** (hablan de hoy, no del mes mirado): `ritmoDelMes()` de la pantalla de inicio, el fallback de `parsearLineas`, y `mesesRecientes()` en la detección de recurrentes.
 - `renderInicio()` guarda y restaura `mesVisible` alrededor de `pintarInicio()`: la pantalla de inicio siempre habla de hoy aunque en Gastos estés mirando julio.
 - Al terminar de importar, `confirmarImport()` **salta al mes donde cayeron los gastos** y lo dice en el mensaje. Si quedaron repartidos en varios meses, los lista.
+
+### Rediseño / simplificación (etapa 1 hecha 2026-08-16, etapa 2 pendiente)
+
+El usuario dijo que la app tenía "demasiado relleno" y que se perdía. Se decidió simplificar **antes** de seguir agregando features, porque cada cosa nueva se apoyaba en la estructura vieja.
+
+**De 6 botones a 2 + Ajustes.** Orden: **Resumen** (primera y por defecto) → **Gastos** → ⚙ Ajustes.
+
+- **Se sacó Proyección** entera ("me parece al pedo"), **Esta semana** (no lo convencía) y la pestaña **Presupuesto**.
+- **Se sacaron de todas las vistas**: la tira de KPIs (`#kpi-scroll`) y la barra "Distribución del ingreso" (`#dist-card`), que eran de Presupuesto y aparecían encima de todo. **Están ocultas con `display:none`, no borradas**, porque `recalc()` todavía escribe en ellas.
+- **Resumen** (nuevo, `renderResumen`): chips de período (Este mes / Mes pasado / Últimos 3 / Últimos 12), tarjeta "A dónde va tu ingreso", gastado del período con comparación contra el anterior, gráfico de evolución de 12 meses, y "En qué se te va" con dona + lista. Se calcula **con los gastos cargados**, no con snapshots: ya no hace falta "cerrar" el mes.
+- El gráfico y la dona copian el estilo del Plan de Retiro (línea sin puntos, `tension: 0.3`, dona `cutout: 72%`), con paleta OKLCH propia porque la de allá es para fondo oscuro.
+- **Los tres fondos van separados** dentro de la distribución del ingreso (emergencia / vacaciones / inversiones), con subtotal arriba y sangría abajo. Pedido explícito del usuario.
+
+**Lección de proceso**: se rediseñó dos veces el elemento equivocado porque había dos cosas llamadas "distribución del ingreso" en la misma pantalla (la tira vieja arriba y la tarjeta nueva abajo). **Antes de rediseñar, confirmar con el usuario cuál es el elemento** (captura o nombre exacto).
+
+**Etapa 2 pendiente**: borrar de verdad el código muerto (vistas viejas, `chartProy`, `chartHist`, `renderInicio`/`pintarInicio`, `renderHistorico`, `closeMonth`, los sliders de proyección y las partes de `recalc()` que alimentan lo oculto) y rehacer el presupuesto según el diseño de dos momentos de arriba.
+
+**Referencia visual para el front (que va al final)**: el usuario trajo un mockup de dashboard que le gustó — menú lateral oscuro en escritorio, tarjetas con mucho aire, un solo color de acento fuerte, bloque de saldo con gráfico grande arriba y transacciones recientes abajo.
 
 ### Pestañas
 
