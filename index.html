@@ -1260,30 +1260,6 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
       </div>
     </div>
 
-    <div class="param-group">
-      <div class="grp-label">Proyección</div>
-      <div class="field">
-        <label>Crecimiento salarial anual</label>
-        <div class="field-row">
-          <input type="range" id="crecSalario" min="0" max="0.5" value="0.1" step="0.01">
-          <span class="val" id="v-crecSalario"></span>
-        </div>
-      </div>
-      <div class="field">
-        <label>Inflación anual estimada</label>
-        <div class="field-row">
-          <input type="range" id="inflacionARS" min="0" max="1.5" value="0.5" step="0.05">
-          <span class="val" id="v-inflacionARS"></span>
-        </div>
-      </div>
-      <div class="field">
-        <label>Años a proyectar</label>
-        <div class="field-row">
-          <input type="range" id="anosProy" min="1" max="30" value="10" step="1">
-          <span class="val" id="v-anosProy"></span>
-        </div>
-      </div>
-    </div>
 
     <div class="param-group">
       <div class="grp-label">Alertas de gasto</div>
@@ -1303,362 +1279,7 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
   </aside>
 
   <main>
-    <!-- Estos bloques son del presupuesto planificado y ahora viven en Ajustes.
-         Se dejan ocultos porque recalc() sigue escribiendo en ellos; se limpian
-         en la segunda etapa del rediseño. -->
-    <div class="kpi-scroll" id="kpi-scroll" style="display:none">
-      <div class="kpi kpi-hero">
-        <div class="kpi-label">Superávit / Déficit</div>
-        <div class="kpi-val" id="kpi-sup"></div>
-        <div class="kpi-sub" id="kpi-sup-sub"></div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Ingresos</div>
-        <div class="kpi-val blue" id="kpi-ing"></div>
-        <div class="kpi-sub">mensual</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Gastos totales</div>
-        <div class="kpi-val" id="kpi-gas"></div>
-        <div class="kpi-sub" id="kpi-gas-pct"></div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Inversión / Ahorro</div>
-        <div class="kpi-val green" id="kpi-inv"></div>
-        <div class="kpi-sub" id="kpi-inv-pct"></div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Salario real (hoy)</div>
-        <div class="kpi-val purple" id="kpi-real"></div>
-        <div class="kpi-sub" id="kpi-real-sub">en 10 años</div>
-      </div>
-    </div>
-
-    <!-- BARRA DISTRIBUCIÓN — era de la pantalla Presupuesto y quedaba encima de
-         todas las vistas. Oculta: la distribución del ingreso ahora vive dentro
-         del Resumen. Se borra del todo en la etapa 2, junto con recalc(). -->
-    <div class="dist-card" id="dist-card" style="display:none">
-      <div class="dist-card-hdr">Distribución del ingreso</div>
-      <div class="dist-bar" id="dist-bar"></div>
-      <div class="dist-legend" id="dist-legend"></div>
-    </div>
-
     <div class="content">
-      <!-- VIEW: INICIO / ESTA SEMANA -->
-      <div id="view-inicio">
-        <div class="view-pad inicio-view">
-          <div class="ini-card">
-            <div class="ini-hero-label" id="ini-hero-label">Gastado esta semana</div>
-            <div class="ini-hero-val" id="ini-total">$0</div>
-            <div class="ini-hero-sub" id="ini-sub"></div>
-            <div class="ini-bars" id="ini-bars"></div>
-          </div>
-
-          <div class="ini-card" id="ini-ritmo"></div>
-
-          <div class="ini-card" id="ini-acciones" style="display:none"></div>
-
-          <div class="ini-card">
-            <div class="ini-card-hdr">Movimientos de esta semana</div>
-            <div id="ini-lista"></div>
-            <button class="ini-cta" onclick="irACargarGasto()">+ Cargar un gasto</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- VIEW: PRESUPUESTO -->
-      <div id="view-presupuesto" style="display:none">
-        <div class="view-pad">
-
-          <!-- RESUMEN (hero) -->
-          <div class="hero-card">
-            <div class="hero-top">
-              <div>
-                <div class="hero-eyebrow">Superávit / déficit del mes</div>
-                <div class="hero-sup" id="res-sup"></div>
-                <div class="hero-sub"><span id="res-sup-pct"></span> del ingreso</div>
-              </div>
-            </div>
-            <div class="hero-stats">
-              <div class="hero-stat">
-                <div class="hero-stat-label">Ingresos</div>
-                <div class="hero-stat-val" id="res-ing"></div>
-              </div>
-              <div class="hero-stat">
-                <div class="hero-stat-label">Gastos</div>
-                <div class="hero-stat-val" id="res-gas"></div>
-                <div class="hero-stat-pct" id="res-gas-pct"></div>
-              </div>
-              <div class="hero-stat">
-                <div class="hero-stat-label">Inversión</div>
-                <div class="hero-stat-val" id="res-inv"></div>
-                <div class="hero-stat-pct" id="res-inv-pct"></div>
-              </div>
-            </div>
-            <div class="chip-row">
-              <div class="stat-chip">% a gastos: <b id="ind-gas"></b></div>
-              <div class="stat-chip">% a inversión: <b id="ind-inv"></b></div>
-              <div class="stat-chip">Tasa de ahorro: <b id="ind-ahorro"></b></div>
-            </div>
-          </div>
-
-          <div class="section-title">Categorías</div>
-          <div class="cards-grid">
-
-            <!-- INGRESOS -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--accent)"></span>
-                <span class="cat-title">Ingresos</span>
-                <span class="cat-total blue" id="t-ingresos"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Salario mensual</span>
-                  <span class="li-pct" id="p-salario">100%</span>
-                  <span class="li-amt blue" id="a-salario"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- GASTOS FIJOS -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--red)"></span>
-                <span class="cat-title">Gastos Fijos</span>
-                <span class="cat-total red" id="t-fijos"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Estudios y aprendizaje</span>
-                  <span class="li-pct" id="p-estudios"></span>
-                  <span class="li-amt" id="a-estudios"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- VIVIENDA -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--gold)"></span>
-                <span class="cat-title">Vivienda</span>
-                <span class="cat-total orange" id="t-vivienda"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Alquiler / expensas</span>
-                  <span class="li-pct" id="p-alquiler"></span>
-                  <span class="li-amt" id="a-alquiler"></span>
-                </div>
-                <div class="line-item">
-                  <span class="li-name">Servicios (luz, agua, gas, internet)</span>
-                  <span class="li-pct" id="p-servicios"></span>
-                  <span class="li-amt" id="a-servicios"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- ALIMENTACIÓN -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:oklch(65% .13 130)"></span>
-                <span class="cat-title">Alimentación</span>
-                <span class="cat-total" style="color:var(--lime-text)" id="t-alimentacion"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Supermercado / almacén</span>
-                  <span class="li-pct" id="p-supermercado"></span>
-                  <span class="li-amt" id="a-supermercado"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- AUTO -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--purple)"></span>
-                <span class="cat-title">Auto</span>
-                <span class="cat-total" style="color:var(--purple-text)" id="t-auto"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Nafta</span>
-                  <span class="li-pct" id="p-nafta"></span>
-                  <span class="li-amt" id="a-nafta"></span>
-                </div>
-                <div class="line-item" id="row-vis-seguroAuto" style="display:none">
-                  <span class="li-name">Seguro <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-seguroAuto"></span>
-                  <span class="li-amt" id="a-seguroAuto"></span>
-                </div>
-                <div class="line-item" id="row-vis-patente" style="display:none">
-                  <span class="li-name">Patente / impuestos <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-patente"></span>
-                  <span class="li-amt" id="a-patente"></span>
-                </div>
-                <div class="line-item" id="row-vis-mantenimientoAuto" style="display:none">
-                  <span class="li-name">Mantenimiento / service <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-mantenimientoAuto"></span>
-                  <span class="li-amt" id="a-mantenimientoAuto"></span>
-                </div>
-                <div class="line-item" id="row-vis-auto" style="display:none">
-                  <span class="li-name">Cuota / leasing <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-auto"></span>
-                  <span class="li-amt" id="a-auto"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- BIENESTAR / DEPORTE -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:oklch(62% .09 210)"></span>
-                <span class="cat-title">Bienestar / Deporte</span>
-                <span class="cat-total" style="color:var(--cyan-text)" id="t-bienestar"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Gimnasio</span>
-                  <span class="li-pct" id="p-gimnasio"></span>
-                  <span class="li-amt" id="a-gimnasio"></span>
-                </div>
-                <div class="line-item" id="row-vis-deportes" style="display:none">
-                  <span class="li-name">Deportes (fútbol, pádel, etc.) <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-deportes"></span>
-                  <span class="li-amt" id="a-deportes"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- GASTOS VARIABLES -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:oklch(55% .015 264)"></span>
-                <span class="cat-title">Gastos Variables</span>
-                <span class="cat-total" id="t-variables"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Juntadas / salidas / comidas afuera</span>
-                  <span class="li-pct" id="p-juntadas"></span>
-                  <span class="li-amt" id="a-juntadas"></span>
-                </div>
-                <div class="line-item">
-                  <span class="li-name">Suscripciones</span>
-                  <span class="li-pct" id="p-suscripciones"></span>
-                  <span class="li-amt" id="a-suscripciones"></span>
-                </div>
-                <div class="line-item">
-                  <span class="li-name">CNC / imprevistos</span>
-                  <span class="li-pct" id="p-cnc"></span>
-                  <span class="li-amt" id="a-cnc"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- FONDOS Y AHORROS -->
-            <div class="cat-card">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--green)"></span>
-                <span class="cat-title">Fondos y Ahorros</span>
-                <span class="cat-total green" id="t-fondos"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item">
-                  <span class="li-name">Fondo de Emergencia</span>
-                  <span class="li-pct" id="p-fEmergencia"></span>
-                  <span class="li-amt green" id="a-fEmergencia"></span>
-                </div>
-                <div class="line-item">
-                  <span class="li-name">Fondo de Vacaciones</span>
-                  <span class="li-pct" id="p-fVacaciones"></span>
-                  <span class="li-amt green" id="a-fVacaciones"></span>
-                </div>
-                <div class="line-item">
-                  <span class="li-name">Fondo de Inversiones</span>
-                  <span class="li-pct" id="p-fInversiones"></span>
-                  <span class="li-amt green" id="a-fInversiones"></span>
-                </div>
-                <div class="line-item total-line">
-                  <span class="li-name">Subtotal Fondos</span>
-                  <span class="li-pct" id="p-totalFondos"></span>
-                  <span class="li-amt green" id="a-totalFondos"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- SALUD -->
-            <div class="cat-card" id="section-salud" style="display:none">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:oklch(62% .15 350)"></span>
-                <span class="cat-title">Salud</span>
-                <span class="cat-total" style="color:var(--pink-text)" id="t-salud"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item" id="row-vis-prepaga" style="display:none">
-                  <span class="li-name">Prepaga / salud <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-prepaga"></span>
-                  <span class="li-amt" id="a-prepaga"></span>
-                </div>
-                <div class="line-item" id="row-vis-farmacia" style="display:none">
-                  <span class="li-name">Farmacia / medicamentos <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-farmacia"></span>
-                  <span class="li-amt" id="a-farmacia"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- OTROS EXTRA (VIAJES) -->
-            <div class="cat-card" id="section-extras" style="display:none">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--teal)"></span>
-                <span class="cat-title">Otros Gastos</span>
-                <span class="cat-total" style="color:var(--teal-text)" id="t-extras"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item" id="row-vis-viajes" style="display:none">
-                  <span class="li-name">Viajes <span class="tag-extra">EXTRA</span></span>
-                  <span class="li-pct" id="p-viajes"></span>
-                  <span class="li-amt" id="a-viajes"></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- FAMILIA -->
-            <div class="cat-card" id="section-familia" style="display:none">
-              <div class="cat-card-hdr">
-                <span class="cat-dot" style="background:var(--teal)"></span>
-                <span class="cat-title">Gastos Familiares</span>
-                <span class="cat-total" style="color:var(--teal-text)" id="t-familia"></span>
-              </div>
-              <div class="cat-card-body">
-                <div class="line-item" id="row-vis-colegio" style="display:none">
-                  <span class="li-name">Colegio / educación hijos <span class="tag-fam">FAMILIA</span></span>
-                  <span class="li-pct" id="p-colegio"></span>
-                  <span class="li-amt" id="a-colegio"></span>
-                </div>
-                <div class="line-item" id="row-vis-ninera" style="display:none">
-                  <span class="li-name">Niñera / jardín <span class="tag-fam">FAMILIA</span></span>
-                  <span class="li-pct" id="p-ninera"></span>
-                  <span class="li-amt" id="a-ninera"></span>
-                </div>
-                <div class="line-item" id="row-vis-actividades" style="display:none">
-                  <span class="li-name">Actividades / deportes hijos <span class="tag-fam">FAMILIA</span></span>
-                  <span class="li-pct" id="p-actividades"></span>
-                  <span class="li-amt" id="a-actividades"></span>
-                </div>
-                <div class="line-item" id="row-vis-casaFam" style="display:none">
-                  <span class="li-name">Casa más grande / barrio <span class="tag-fam">FAMILIA</span></span>
-                  <span class="li-pct" id="p-casaFam"></span>
-                  <span class="li-amt" id="a-casaFam"></span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
       <!-- VIEW: GASTOS DEL MES -->
       <div id="view-gastos" style="display:none">
         <div class="view-pad gastos-view">
@@ -1672,7 +1293,6 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
                 <button class="mes-hoy" id="mes-hoy" onclick="irAlMesActual()" style="display:none">Volver a hoy</button>
               </span>
             </div>
-            <button class="btn-close-month" onclick="closeMonth()">📌 Cerrar mes</button>
           </div>
 
           <div class="alertas-banner" id="alertas-banner" style="display:none"></div>
@@ -1769,7 +1389,6 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
         </div>
       </div>
 
-      <!-- VIEW: HISTÓRICO -->
       <!-- VIEW: RESUMEN -->
       <div id="view-resumen" style="display:none">
         <div class="view-pad res-view">
@@ -1810,71 +1429,7 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
         </div>
       </div>
 
-      <div id="view-historico" style="display:none">
-        <div class="view-pad proy-view">
-          <div class="chart-hdr">
-            <span class="chart-title">Evolución mensual (meses cerrados)</span>
-            <div class="chart-legend-row">
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(58% .18 25)"></span>Gasto real</span>
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(56% .13 150)"></span>Superávit real</span>
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(55% .15 264)"></span>Ingreso</span>
-            </div>
-          </div>
-          <div class="chart-wrap-inner">
-            <canvas id="chart-historico"></canvas>
-          </div>
-          <div class="table-card proy-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Mes</th>
-                  <th>Ingreso</th>
-                  <th>Presupuestado</th>
-                  <th>Gasto real</th>
-                  <th>Superávit real</th>
-                  <th>% Ahorro real</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="tbody-historico"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
 
-      <!-- VIEW: PROYECCIÓN -->
-      <div id="view-proyeccion" style="display:none">
-        <div class="view-pad proy-view">
-          <div class="chart-hdr">
-            <span class="chart-title">Evolución del salario y gastos totales (ARS nominales)</span>
-            <div class="chart-legend-row">
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(55% .15 264)"></span>Salario</span>
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(58% .18 25)"></span>Gastos</span>
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(56% .13 150)"></span>Inversión</span>
-              <span class="lg-item"><span class="lg-swatch" style="background:oklch(52% .16 300);border-top:2px dashed oklch(52% .16 300);height:0"></span>Sal. real</span>
-            </div>
-          </div>
-          <div class="chart-wrap-inner">
-            <canvas id="chart-proy"></canvas>
-          </div>
-          <div class="table-card proy-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Año</th>
-                  <th>Salario Nominal</th>
-                  <th>Salario Real</th>
-                  <th>Gastos Totales</th>
-                  <th>Inversión</th>
-                  <th>Superávit</th>
-                  <th>% Ahorro</th>
-                </tr>
-              </thead>
-              <tbody id="tbody-proy"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
     </div>
   </main>
 </div>
@@ -1901,21 +1456,23 @@ function toggleSidebar() {
   const a = $('aside'), backdrop = $('sheet-backdrop'), open = a.classList.toggle('open');
   backdrop.classList.toggle('open', open);
 }
+// Al mover un parámetro se repinta la pantalla actual (antes esto lo hacía
+// recalc(), que alimentaba pantallas que ya no existen).
+function repintar() {
+  if (currentTab === 'resumen') renderResumen();
+  else if (currentTab === 'gastos') renderGastos();
+}
+
 function setTab(t) {
   currentTab = t;
   document.querySelectorAll('.tab[data-tab], .bn-item[data-tab]').forEach(b => b.classList.remove('active'));
   document.querySelectorAll(`[data-tab="${t}"]`).forEach(b => b.classList.add('active'));
   $('view-gastos').style.display  = t === 'gastos'  ? '' : 'none';
   $('view-resumen').style.display = t === 'resumen' ? '' : 'none';
-  // Vistas del diseño viejo: quedan ocultas hasta que se borren del todo.
-  ['view-inicio', 'view-presupuesto', 'view-historico', 'view-proyeccion'].forEach(id => {
-    if ($(id)) $(id).style.display = 'none';
-  });
   if (t === 'gastos') renderGastos();
   if (t === 'resumen') renderResumen();
   const a = $('aside');
   if (a.classList.contains('open')) toggleSidebar();
-  recalc();
 }
 
 // ── PERSISTENCIA ─────────────────────────────────────────────────────────
@@ -1968,9 +1525,6 @@ const sliders = {
   ninera:           v => fmtARS(v),
   actividades:      v => fmtARS(v),
   casaFam:          v => fmtARS(v),
-  crecSalario:      v => fmtPct(v),
-  inflacionARS:     v => fmtPct(v),
-  anosProy:         v => `${v} años`,
 };
 
 Object.keys(sliders).forEach(id => {
@@ -1979,8 +1533,8 @@ Object.keys(sliders).forEach(id => {
   const vEl = $('v-' + id);
   const update = () => {
     if (vEl) vEl.textContent = sliders[id](parseFloat(el.value));
-    recalc();
     saveParams();
+    repintar();
   };
   el.addEventListener('input', update);
   if (vEl) vEl.textContent = sliders[id](parseFloat(el.value));
@@ -1992,39 +1546,13 @@ toggles.forEach(id => {
   const tog = $('tog-' + id);
   tog.addEventListener('change', () => {
     $('row-' + id).style.display = tog.checked ? '' : 'none';
-    recalc();
     saveParams();
+    repintar();
   });
 });
 
-// ── CHART SETUP ───────────────────────────────────────────────────────────
-const ctxProy = $('chart-proy').getContext('2d');
-const chartProy = new Chart(ctxProy, {
-  type: 'line',
-  data: { labels: [], datasets: [] },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    animation: { duration: 180 },
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: '#ffffff', borderColor: '#e7e4e0', borderWidth: 1,
-        titleColor: '#9d9a95', bodyColor: '#1a1a18', padding: 10,
-        callbacks: { label: c => ` ${c.dataset.label}: ${fmtARS(c.parsed.y)}` }
-      }
-    },
-    scales: {
-      x: { ticks: { color: '#9d9a95', font: { size: 10 } }, grid: { color: 'rgba(26,26,24,.08)' }, border: { color: '#e7e4e0' } },
-      y: {
-        ticks: { color: '#9d9a95', font: { size: 10 }, callback: v => fmtARS(v) },
-        grid: { color: 'rgba(26,26,24,.08)' }, border: { color: '#e7e4e0' }
-      }
-    }
-  }
-});
+// ── GRÁFICOS ─────────────────────────────────────────────────────────────
 
-const ctxHist = $('chart-historico').getContext('2d');
 const ctxRes = $('chart-rs') ? $('chart-rs').getContext('2d') : null;
 const chartRes = ctxRes ? new Chart(ctxRes, {
   type: 'line',
@@ -2076,30 +1604,6 @@ const chartCats = ctxCats ? new Chart(ctxCats, {
   }
 }) : null;
 
-const chartHist = new Chart(ctxHist, {
-  type: 'line',
-  data: { labels: [], datasets: [] },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    animation: { duration: 180 },
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: '#ffffff', borderColor: '#e7e4e0', borderWidth: 1,
-        titleColor: '#9d9a95', bodyColor: '#1a1a18', padding: 10,
-        callbacks: { label: c => ` ${c.dataset.label}: ${fmtARS(c.parsed.y)}` }
-      }
-    },
-    scales: {
-      x: { ticks: { color: '#9d9a95', font: { size: 10 } }, grid: { color: 'rgba(26,26,24,.08)' }, border: { color: '#e7e4e0' } },
-      y: {
-        ticks: { color: '#9d9a95', font: { size: 10 }, callback: v => fmtARS(v) },
-        grid: { color: 'rgba(26,26,24,.08)' }, border: { color: '#e7e4e0' }
-      }
-    }
-  }
-});
 
 // ── GASTOS DEL MES ────────────────────────────────────────────────────────
 const LS_GASTOS = 'presupuesto_gastos_v1';
@@ -3397,265 +2901,13 @@ function verPeriodo(id) { periodoActivo = id; renderResumen(); }
 // una tabla vacía. La semana va de lunes a domingo.
 const DIAS_CORTOS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-function isoDia(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function lunesDeLaSemana(d = new Date()) {
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));   // getDay(): 0 = domingo
-  return x;
-}
-function indiceDiaHoy() { return (new Date().getDay() + 6) % 7; }
 // Una semana puede cruzar dos meses, así que aplanamos todos los meses.
-function todosLosGastos() {
-  const all = loadGastosAll();
-  return Object.keys(all).reduce((acc, k) => acc.concat(all[k] || []), []);
-}
-function resumenSemana(offsetSemanas = 0) {
-  const lunes = lunesDeLaSemana();
-  lunes.setDate(lunes.getDate() + offsetSemanas * 7);
-  const dias = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(lunes); d.setDate(d.getDate() + i);
-    dias.push(isoDia(d));
-  }
-  const enRango = todosLosGastos().filter(g => g.fecha >= dias[0] && g.fecha <= dias[6]);
-  return {
-    desde: dias[0], hasta: dias[6],
-    lista: enRango.slice().sort((a, b) => b.fecha.localeCompare(a.fecha) || b.monto - a.monto),
-    total: enRango.reduce((s, g) => s + g.monto, 0),
-    porDia: dias.map(iso => ({ iso, monto: enRango.reduce((s, g) => g.fecha === iso ? s + g.monto : s, 0) })),
-  };
-}
-function totalHastaDia(res, idx) {
-  return res.porDia.slice(0, idx + 1).reduce((s, d) => s + d.monto, 0);
-}
 
-function ritmoDelMes() {
-  const hoy = new Date();
-  const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-  const diaHoy = hoy.getDate();
-  let presu = 0;
-  PV_CAT_IDS.forEach(id => { presu += getPresupuestoCat(id); });
-  const gastado = (loadGastosAll()[monthKey()] || []).reduce((s, g) => s + g.monto, 0);
-  const diasRestantes = Math.max(diasMes - diaHoy, 0);
-  const restante = presu - gastado;
-  return {
-    diasMes, diaHoy, diasRestantes, presu, gastado, restante,
-    pctMes: diaHoy / diasMes,
-    pctGasto: presu > 0 ? gastado / presu : 0,
-    porDia: diasRestantes > 0 ? restante / diasRestantes : restante,
-  };
-}
 
-function irACargarGasto() {
-  setTab('gastos');
-  const el = $('gasto-monto');
-  if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); }
-}
 
-function renderInicio() {
-  if (!$('ini-total')) return;
-  // La pantalla de inicio siempre habla de hoy, aunque en la pestaña de gastos
-  // estés mirando otro mes.
-  const mesGuardado = mesVisible;
-  mesVisible = monthKey();
-  try { pintarInicio(); } finally { mesVisible = mesGuardado; }
-}
-function pintarInicio() {
-  const sem = resumenSemana(0);
-  const prev = resumenSemana(-1);
-  const idx = indiceDiaHoy();
-
-  // ── Hero: cuánto va la semana y cómo viene contra la anterior ──
-  $('ini-total').textContent = fmtARS(sem.total);
-  const hastaHoy = totalHastaDia(sem, idx);
-  const prevHastaHoy = totalHastaDia(prev, idx);
-  let sub;
-  if (prev.total <= 0) {
-    sub = sem.total > 0
-      ? 'Todavía no tengo con qué comparar: es tu primera semana con gastos cargados.'
-      : 'Cargá tus primeros gastos y acá vas a ver cómo viene la semana.';
-  } else {
-    const dif = hastaHoy - prevHastaHoy;
-    const pct = prevHastaHoy > 0 ? Math.abs(dif) / prevHastaHoy : 0;
-    const color = dif > 0 ? 'var(--red-text)' : 'var(--green-text)';
-    sub = Math.abs(dif) < 1
-      ? `Vas igual que la semana pasada a esta altura (${fmtARS(prevHastaHoy)}).`
-      : `<b style="color:${color}">${dif > 0 ? '↑' : '↓'} ${fmtARS(Math.abs(dif))} ${dif > 0 ? 'más' : 'menos'}</b> que la semana pasada a esta altura${pct ? ` (${fmtPctInt(pct)})` : ''}.`;
-  }
-  $('ini-sub').innerHTML = sub;
-
-  const maxDia = Math.max(...sem.porDia.map(d => d.monto), 1);
-  $('ini-bars').innerHTML = sem.porDia.map((d, i) => `
-    <div class="ini-bar-col${i === idx ? ' hoy' : ''}" title="${DIAS_CORTOS[i]} ${d.iso.slice(8)}: ${fmtARS(d.monto)}">
-      <div class="ini-bar-track"><div class="ini-bar-fill" style="height:${Math.max((d.monto / maxDia) * 100, 3)}%"></div></div>
-      <div class="ini-bar-lbl">${DIAS_CORTOS[i]}</div>
-    </div>`).join('');
-
-  // ── Ritmo del mes: ¿gastaste más rápido de lo que pasa el mes? ──
-  const r = ritmoDelMes();
-  const cont = $('ini-ritmo');
-  if (r.presu <= 0) {
-    cont.innerHTML = `
-      <div class="ini-card-hdr">Ritmo del mes</div>
-      <div class="ini-ritmo-txt">Todavía no definiste presupuesto en ninguna categoría, así que no puedo decirte si vas bien o mal. Andá a <b>Presupuesto</b> y movés los deslizadores.</div>`;
-  } else {
-    const desvio = r.pctGasto - r.pctMes;
-    const v = r.gastado > r.presu ? { txt: 'Te pasaste del mes', col: 'var(--red-text)', barra: 'var(--red)' }
-            : desvio > 0.10      ? { txt: 'Vas gastando rápido', col: 'var(--gold-text)', barra: 'var(--gold)' }
-            : desvio > 0.02      ? { txt: 'Vas justo', col: 'var(--gold-text)', barra: 'var(--gold)' }
-            :                      { txt: 'Vas bien', col: 'var(--green-text)', barra: 'var(--green)' };
-    const sobra = r.restante >= 0;
-    cont.innerHTML = `
-      <div class="ini-ritmo-top">
-        <span class="ini-veredicto" style="color:${v.col}">${v.txt}</span>
-        <span class="ini-ritmo-pct">Día ${r.diaHoy} de ${r.diasMes}</span>
-      </div>
-      <div class="ini-doblebarra">
-        <div class="ini-db-gasto" style="width:${Math.min(r.pctGasto, 1) * 100}%;background:${v.barra}"></div>
-        <div class="ini-db-marca" style="left:${Math.min(r.pctMes, 1) * 100}%" title="Por acá debería ir si gastaras parejo"></div>
-      </div>
-      <div class="ini-db-leyenda">
-        <span>Usaste ${fmtPctInt(r.pctGasto)} del presupuesto</span>
-        <span>Pasó ${fmtPctInt(r.pctMes)} del mes</span>
-      </div>
-      <div class="ini-ritmo-txt">
-        Llevás gastados <b>${fmtARS(r.gastado)}</b> de <b>${fmtARS(r.presu)}</b>.
-        ${sobra
-          ? (r.diasRestantes > 0
-              ? `Te quedan <b>${fmtARS(r.restante)}</b> para ${r.diasRestantes} día${r.diasRestantes > 1 ? 's' : ''}, o sea <b>${fmtARS(r.porDia)}</b> por día.`
-              : `Te quedan <b>${fmtARS(r.restante)}</b> y hoy es el último día del mes.`)
-          : `Te pasaste por <b style="color:var(--red-text)">${fmtARS(-r.restante)}</b> y todavía faltan ${r.diasRestantes} día${r.diasRestantes === 1 ? '' : 's'}.`}
-      </div>`;
-  }
-
-  // ── Qué te falta hacer ──
-  const pendFijos = estadoFijos().filter(f => !f.cargado).length;
-  const cfgAl = loadAlertasCfg();
-  const enAlerta = cfgAl.activas
-    ? calcularAlertas().filter(a => a.nivel > 0 && !getAlertaEstado(a.id).mute)
-    : [];
-  const excesos = enAlerta.filter(a => a.nivel >= NIVEL_EXCESO).length;
-  const avisos = enAlerta.length - excesos;
-  const sugerencias = detectarCandidatosFijos().length;
-
-  const acciones = [];
-  if (pendFijos) acciones.push({ ic: '📌', txt: `Te ${pendFijos > 1 ? 'faltan' : 'falta'} cargar <b>${pendFijos}</b> gasto${pendFijos > 1 ? 's' : ''} fijo${pendFijos > 1 ? 's' : ''} de este mes.`, btn: 'Cargarlos' });
-  if (excesos)   acciones.push({ ic: '🚨', txt: `<b>${excesos}</b> rubro${excesos > 1 ? 's' : ''} ya ${excesos > 1 ? 'pasaron' : 'pasó'} el presupuesto del mes.`, btn: 'Ver' });
-  if (avisos)    acciones.push({ ic: '⚠️', txt: `<b>${avisos}</b> rubro${avisos > 1 ? 's están' : ' está'} cerca del límite.`, btn: 'Ver' });
-  if (sugerencias) acciones.push({ ic: '💡', txt: `Detecté <b>${sugerencias}</b> gasto${sugerencias > 1 ? 's que se repiten' : ' que se repite'} todos los meses.`, btn: 'Revisar' });
-
-  const accEl = $('ini-acciones');
-  if (!acciones.length) { accEl.style.display = 'none'; accEl.innerHTML = ''; }
-  else {
-    accEl.style.display = '';
-    accEl.innerHTML = `<div class="ini-card-hdr">Te está esperando</div>` + acciones.map(a => `
-      <div class="ini-acc-row">
-        <span class="ini-acc-ic">${a.ic}</span>
-        <span class="ini-acc-txt">${a.txt}</span>
-        <button class="ini-acc-btn" onclick="setTab('gastos')">${a.btn}</button>
-      </div>`).join('');
-  }
-
-  // ── Movimientos de la semana ──
-  const lista = $('ini-lista');
-  if (!sem.lista.length) {
-    lista.innerHTML = `<div class="ini-vacio">Todavía no cargaste ningún gasto esta semana.<br>Anotalos apenas los hacés y no se te escapa nada.</div>`;
-  } else {
-    lista.innerHTML = sem.lista.slice(0, 8).map(g => {
-      const d = new Date(g.fecha + 'T00:00:00');
-      return `
-        <div class="ini-mov">
-          <span class="ini-mov-dia">${d.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '')}<br>${d.getDate()}</span>
-          <span class="ini-mov-cat">${esc(catLabel(g.cat))}${g.nota ? `<span class="ini-mov-nota">${esc(g.nota)}</span>` : ''}</span>
-          <span class="ini-mov-monto">${fmtARS(g.monto)}</span>
-        </div>`;
-    }).join('')
-    + (sem.lista.length > 8 ? `<div class="ini-vacio" style="padding-bottom:8px">y ${sem.lista.length - 8} movimiento${sem.lista.length - 8 > 1 ? 's' : ''} más</div>` : '');
-  }
-}
 
 // ── HISTÓRICO / SNAPSHOTS MENSUALES ─────────────────────────────────────
 const LS_SNAPSHOTS = 'presupuesto_snapshots_v1';
-function loadSnapshots() {
-  try { return JSON.parse(localStorage.getItem(LS_SNAPSHOTS) || '{}'); } catch (e) { return {}; }
-}
-function saveSnapshots(all) {
-  try { localStorage.setItem(LS_SNAPSHOTS, JSON.stringify(all)); } catch (e) {}
-}
-function closeMonth() {
-  const key = mesVisible;
-  const salario = g('salario');
-  let totalPresu = 0;
-  PV_CAT_IDS.forEach(id => { totalPresu += getPresupuestoCat(id); });
-
-  const all = loadGastosAll();
-  const list = all[key] || [];
-  const gastoReal = list.reduce((s, x) => s + x.monto, 0);
-  const byCat = {};
-  list.forEach(x => { byCat[x.cat] = (byCat[x.cat] || 0) + x.monto; });
-  const superavitReal = salario - gastoReal;
-
-  const snaps = loadSnapshots();
-  const already = !!snaps[key];
-  if (!confirm(already
-    ? `Ya cerraste ${monthLabel(key)} antes. ¿Actualizar el snapshot con los datos actuales?`
-    : `¿Cerrar ${monthLabel(key)} y guardar el resumen en el histórico?\n\nIngreso: ${fmtARS(salario)}\nGasto real: ${fmtARS(gastoReal)}\nSuperávit real: ${fmtARS(superavitReal)}\n\nEsto no borra tus gastos cargados, solo guarda una foto del mes.`)) return;
-
-  snaps[key] = { mes: key, salario, totalPresu, gastoReal, superavitReal, byCat, closedAt: Date.now() };
-  saveSnapshots(snaps);
-  alert('Mes guardado en el histórico ✓');
-  if (currentTab === 'historico') renderHistorico();
-}
-function deleteSnapshot(key) {
-  const snaps = loadSnapshots();
-  delete snaps[key];
-  saveSnapshots(snaps);
-  renderHistorico();
-}
-function renderHistorico() {
-  const snaps = loadSnapshots();
-  const keys = Object.keys(snaps).sort();
-  const tbody = $('tbody-historico');
-
-  if (!keys.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="gastos-empty">Todavía no cerraste ningún mes. Andá a "Gastos del mes" y usá el botón 📌 Cerrar mes cuando termine el período.</td></tr>`;
-    chartHist.data.labels = [];
-    chartHist.data.datasets = [];
-    chartHist.update();
-    return;
-  }
-
-  const labels = keys.map(k => monthLabelShort(k));
-  const dataIng = keys.map(k => snaps[k].salario);
-  const dataGas = keys.map(k => snaps[k].gastoReal);
-  const dataSup = keys.map(k => snaps[k].superavitReal);
-
-  chartHist.data.labels = labels;
-  chartHist.data.datasets = [
-    { label: 'Ingreso', data: dataIng, borderColor: 'oklch(55% .15 264)', backgroundColor: 'oklch(55% .15 264 / .08)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false, tension: 0.25 },
-    { label: 'Gasto real', data: dataGas, borderColor: 'oklch(58% .18 25)', backgroundColor: 'oklch(58% .18 25 / .06)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: false, tension: 0.25 },
-    { label: 'Superávit real', data: dataSup, borderColor: 'oklch(56% .13 150)', backgroundColor: 'oklch(56% .13 150 / .1)', borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, fill: true, tension: 0.25 },
-  ];
-  chartHist.update();
-
-  tbody.innerHTML = keys.map(k => {
-    const s = snaps[k];
-    const supClass = s.superavitReal >= 0 ? 'surplus-pos' : 'surplus-neg';
-    const pctAh = s.salario > 0 ? s.superavitReal / s.salario : 0;
-    return `
-      <tr>
-        <td data-label="Mes" style="text-transform:capitalize">${monthLabel(k)}</td>
-        <td data-label="Ingreso" style="color:var(--accent-text);font-weight:500">${fmtARS(s.salario)}</td>
-        <td data-label="Presupuestado" style="color:var(--muted)">${fmtARS(s.totalPresu)}</td>
-        <td data-label="Gasto real" style="color:var(--red-text)">${fmtARS(s.gastoReal)}</td>
-        <td data-label="Superávit real" class="${supClass}">${fmtARS(s.superavitReal)}</td>
-        <td data-label="% Ahorro" style="color:var(--muted)">${fmtPct(pctAh)}</td>
-        <td><button class="del-gasto-btn" onclick="deleteSnapshot('${k}')" title="Eliminar snapshot">✕</button></td>
-      </tr>`;
-  }).join('');
-}
 
 // ── TIPO DE CAMBIO Y CONEXIÓN CON EL PLAN DE RETIRO ─────────────────────
 const LS_TC = 'presupuesto_tc_v1';
@@ -3737,251 +2989,6 @@ function importBackup(evt) {
 function g(id) { return parseFloat($(id).value); }
 function tog(id) { return $('tog-' + id).checked; }
 
-function recalc() {
-  const salario = g('salario');
-  const estudios = g('estudios');
-  const alquiler = g('alquiler');
-  const servicios = g('servicios');
-  const supermercado = g('supermercado');
-  const juntadas = g('juntadas');
-  const gimnasio = g('gimnasio');
-  const nafta = g('nafta');
-  const suscripciones = g('suscripciones');
-  const cnc = g('cnc');
-  const fEm = g('fEmergencia');
-  const fVac = g('fVacaciones');
-  const fInv = g('fInversiones');
-
-  // auto (opcionales)
-  const seguroAuto = tog('seguroAuto') ? g('seguroAuto') : 0;
-  const patente = tog('patente') ? g('patente') : 0;
-  const mantenimientoAuto = tog('mantenimientoAuto') ? g('mantenimientoAuto') : 0;
-  const auto_ = tog('auto') ? g('auto') : 0;
-
-  // bienestar (opcional)
-  const deportes = tog('deportes') ? g('deportes') : 0;
-
-  // salud (opcionales)
-  const prepaga = tog('prepaga') ? g('prepaga') : 0;
-  const farmacia = tog('farmacia') ? g('farmacia') : 0;
-
-  // extras
-  const viajes = tog('viajes') ? g('viajes') : 0;
-
-  // familia
-  const colegio = tog('colegio') ? g('colegio') : 0;
-  const ninera = tog('ninera') ? g('ninera') : 0;
-  const actividades = tog('actividades') ? g('actividades') : 0;
-  const casaFam = tog('casaFam') ? g('casaFam') : 0;
-
-  const totalFijos = estudios;
-  const totalVivienda = alquiler + servicios;
-  const totalAlimentacion = supermercado;
-  const totalAuto = nafta + seguroAuto + patente + mantenimientoAuto + auto_;
-  const totalBienestar = gimnasio + deportes;
-  const totalVars = juntadas + suscripciones + cnc;
-  const totalSalud = prepaga + farmacia;
-  const totalExtras = viajes;
-  const totalFamilia = colegio + ninera + actividades + casaFam;
-  const totalGastos = totalFijos + totalVivienda + totalAlimentacion + totalAuto + totalBienestar + totalVars + totalSalud + totalExtras + totalFamilia;
-  const totalFondos = fEm + fVac + fInv;
-  const superavit = salario - totalGastos - totalFondos;
-
-  const pct = x => salario > 0 ? x / salario : 0;
-
-  // ── KPIs ──
-  $('kpi-ing').textContent = fmtARS(salario);
-  $('kpi-gas').textContent = fmtARS(totalGastos);
-  $('kpi-gas-pct').textContent = fmtPctInt(pct(totalGastos)) + ' del ingreso';
-  $('kpi-inv').textContent = fmtARS(totalFondos);
-  $('kpi-inv-pct').textContent = fmtPctInt(pct(totalFondos)) + ' del ingreso';
-
-  const supEl = $('kpi-sup');
-  supEl.textContent = fmtARS(superavit);
-  supEl.className = 'kpi-val ' + (superavit >= 0 ? 'green' : 'red');
-  $('kpi-sup-sub').textContent = superavit >= 0 ? 'libre disponible' : '⚠ déficit';
-
-  // salario real proyectado
-  const anos = g('anosProy');
-  const crecSal = g('crecSalario');
-  const inflARS = g('inflacionARS');
-  const salNomFut = salario * Math.pow(1 + crecSal, anos);
-  const salRealFut = salNomFut / Math.pow(1 + inflARS, anos);
-  $('kpi-real').textContent = fmtARS(salRealFut);
-  $('kpi-real-sub').textContent = `en ${anos} años (poder adquisitivo hoy)`;
-
-  // ── BARRA DISTRIBUCIÓN ──
-  const segs = [
-    { label: 'Gastos fijos', val: totalFijos, color: 'oklch(58% .18 25)' },
-    { label: 'Vivienda', val: totalVivienda, color: 'oklch(72% .15 80)' },
-    { label: 'Alimentación', val: totalAlimentacion, color: 'oklch(65% .13 130)' },
-    { label: 'Auto', val: totalAuto, color: 'oklch(52% .16 300)' },
-    { label: 'Bienestar / Variables', val: totalBienestar + totalVars, color: 'oklch(55% .015 264)' },
-    { label: 'Salud / Familia / Otros', val: totalSalud + totalExtras + totalFamilia, color: 'oklch(62% .15 350)' },
-    { label: 'Fondos / Inv.', val: totalFondos, color: 'oklch(56% .13 150)' },
-    { label: 'Libre', val: Math.max(0, superavit), color: 'oklch(55% .15 264)' },
-  ];
-  const total = segs.reduce((a, s) => a + s.val, 0) || 1;
-  $('dist-bar').innerHTML = segs.filter(s => s.val > 0).map(s =>
-    `<div class="dist-seg" style="width:${(s.val/total*100).toFixed(1)}%;background:${s.color}" data-tooltip="${s.label}: ${fmtARS(s.val)} (${fmtPctInt(pct(s.val))})"></div>`
-  ).join('');
-  $('dist-legend').innerHTML = segs.filter(s => s.val > 0).map(s =>
-    `<div class="dist-leg-item"><div class="dist-dot" style="background:${s.color}"></div>${s.label}: ${fmtPctInt(s.val/salario)}</div>`
-  ).join('');
-
-  // ── PRESUPUESTO ROWS ──
-  const rows = [
-    ['salario', salario],
-    ['estudios', estudios],
-    ['alquiler', alquiler],
-    ['servicios', servicios],
-    ['supermercado', supermercado],
-    ['juntadas', juntadas],
-    ['gimnasio', gimnasio],
-    ['deportes', deportes],
-    ['nafta', nafta],
-    ['seguroAuto', seguroAuto],
-    ['patente', patente],
-    ['mantenimientoAuto', mantenimientoAuto],
-    ['auto', auto_],
-    ['suscripciones', suscripciones],
-    ['cnc', cnc],
-    ['fEmergencia', fEm],
-    ['fVacaciones', fVac],
-    ['fInversiones', fInv],
-    ['prepaga', prepaga],
-    ['farmacia', farmacia],
-    ['viajes', viajes],
-    ['colegio', colegio],
-    ['ninera', ninera],
-    ['actividades', actividades],
-    ['casaFam', casaFam],
-  ];
-  rows.forEach(([id, val]) => {
-    const pEl = $('p-' + id);
-    const aEl = $('a-' + id);
-    if (pEl) pEl.textContent = fmtPctInt(pct(val));
-    if (aEl) aEl.textContent = fmtARS(val);
-  });
-
-  // totales de secciones
-  $('t-ingresos').textContent = fmtARS(salario);
-  $('t-fijos').textContent = fmtARS(totalFijos);
-  $('t-vivienda').textContent = fmtARS(totalVivienda);
-  $('t-alimentacion').textContent = fmtARS(totalAlimentacion);
-  $('t-auto').textContent = fmtARS(totalAuto);
-  $('t-bienestar').textContent = fmtARS(totalBienestar);
-  $('t-variables').textContent = fmtARS(totalVars);
-  $('t-fondos').textContent = fmtARS(totalFondos);
-  $('a-totalFondos').textContent = fmtARS(totalFondos);
-  $('p-totalFondos').textContent = fmtPctInt(pct(totalFondos));
-
-  // auto: nafta siempre visible; los opcionales se muestran/ocultan según su toggle
-  ['seguroAuto','patente','mantenimientoAuto','auto'].forEach(id => {
-    $('row-vis-' + id).style.display = tog(id) ? '' : 'none';
-  });
-
-  // bienestar: gimnasio siempre visible; deportes según su toggle
-  $('row-vis-deportes').style.display = tog('deportes') ? '' : 'none';
-
-  // salud visibility (card entera opcional: prepaga + farmacia)
-  const hasSalud = prepaga || farmacia;
-  $('section-salud').style.display = hasSalud ? '' : 'none';
-  if (hasSalud) $('t-salud').textContent = fmtARS(totalSalud);
-  ['prepaga','farmacia'].forEach(id => {
-    $('row-vis-' + id).style.display = tog(id) ? '' : 'none';
-  });
-
-  // extras (viajes) visibility
-  const hasExtras = viajes > 0;
-  $('section-extras').style.display = hasExtras ? '' : 'none';
-  if (hasExtras) $('t-extras').textContent = fmtARS(totalExtras);
-  $('row-vis-viajes').style.display = tog('viajes') ? '' : 'none';
-
-  // familia visibility
-  const hasFam = colegio || ninera || actividades || casaFam;
-  $('section-familia').style.display = hasFam ? '' : 'none';
-  if (hasFam) $('t-familia').textContent = fmtARS(totalFamilia);
-  ['colegio','ninera','actividades','casaFam'].forEach(id => {
-    $('row-vis-' + id).style.display = tog(id) ? '' : 'none';
-  });
-
-  // resumen
-  $('res-ing').textContent = fmtARS(salario);
-  $('res-gas').textContent = fmtARS(totalGastos);
-  $('res-gas-pct').textContent = fmtPctInt(pct(totalGastos));
-  $('res-inv').textContent = fmtARS(totalFondos);
-  $('res-inv-pct').textContent = fmtPctInt(pct(totalFondos));
-  const supResEl = $('res-sup');
-  supResEl.textContent = fmtARS(superavit);
-  supResEl.style.color = superavit >= 0 ? 'var(--green-text)' : 'var(--red-text)';
-  $('res-sup-pct').textContent = fmtPctInt(Math.abs(pct(superavit)));
-
-  // indicadores
-  $('ind-gas').textContent = fmtPct(pct(totalGastos));
-  $('ind-inv').textContent = fmtPct(pct(totalFondos));
-  $('ind-ahorro').textContent = fmtPct(pct(Math.max(0, superavit) + totalFondos));
-
-  // ── GASTOS DEL MES (vivo si estás en esa pestaña) ──
-  if (currentTab === 'gastos') renderGastos();
-
-  // ── PROYECCIÓN ──
-  if (currentTab === 'proyeccion') {
-    const labels = [];
-    const dataSal = [], dataGas = [], dataInv = [], dataSalReal = [];
-    const tableRows = [];
-
-    let salN = salario;
-    // gastos escalan con inflación
-    let gastosN = totalGastos;
-    let fondosN = totalFondos;
-
-    for (let i = 0; i <= anos; i++) {
-      const deflactor = Math.pow(1 + inflARS, i);
-      const salR = salN / deflactor;
-      labels.push(i === 0 ? 'Hoy' : `+${i}a`);
-      dataSal.push(salN);
-      dataGas.push(gastosN);
-      dataInv.push(fondosN);
-      dataSalReal.push(salR);
-      const sup = salN - gastosN - fondosN;
-      tableRows.push({ ano: i, salN, salR, gastosN, fondosN, sup });
-
-      if (i < anos) {
-        salN *= (1 + crecSal);
-        gastosN *= (1 + inflARS);
-        fondosN *= (1 + inflARS);
-      }
-    }
-
-    chartProy.data.labels = labels;
-    chartProy.data.datasets = [
-      { label: 'Salario', data: dataSal, borderColor: 'oklch(55% .15 264)', backgroundColor: 'oklch(55% .15 264 / .08)', borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, fill: true, tension: 0.3 },
-      { label: 'Gastos totales', data: dataGas, borderColor: 'oklch(58% .18 25)', backgroundColor: 'oklch(58% .18 25 / .06)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 },
-      { label: 'Inversión / Fondos', data: dataInv, borderColor: 'oklch(56% .13 150)', backgroundColor: 'oklch(56% .13 150 / .06)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 },
-      { label: 'Salario real (hoy)', data: dataSalReal, borderColor: 'oklch(52% .16 300)', borderDash: [5,3], borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
-    ];
-    chartProy.update();
-
-    const tbody = $('tbody-proy');
-    tbody.innerHTML = '';
-    tableRows.forEach(r => {
-      const sup = r.sup;
-      const supClass = sup >= 0 ? 'surplus-pos' : 'surplus-neg';
-      const pctAh = r.salN > 0 ? (r.fondosN / r.salN) : 0;
-      tbody.innerHTML += `
-        <tr>
-          <td>${r.ano === 0 ? 'Hoy' : '+' + r.ano}</td>
-          <td style="color:var(--accent-text);font-weight:500">${fmtARS(r.salN)}</td>
-          <td style="color:var(--purple)">${fmtARS(r.salR)}</td>
-          <td style="color:var(--red-text)">${fmtARS(r.gastosN)}</td>
-          <td style="color:var(--green-text)">${fmtARS(r.fondosN)}</td>
-          <td class="${supClass}">${fmtARS(sup)}</td>
-          <td style="color:var(--muted)">${fmtPct(pctAh)}</td>
-        </tr>`;
-    });
-  }
-}
 
 // ── INIT ──────────────────────────────────────────────────────────────────
 loadParams();
@@ -3993,7 +3000,6 @@ initGastoCatSelect();
 $('gasto-fecha').value = new Date().toISOString().slice(0, 10);
 loadTC();
 $('tipoCambio').addEventListener('input', () => { saveTC(); updateRetiroPreview(); });
-recalc();
 setTab('resumen');   // deja la vista correcta visible y pinta todo
 </script>
 
@@ -4014,7 +3020,7 @@ function updateChartColors(theme) {
   const border = oscuro ? '#3a383e' : '#e7e4e0';
   const fondoTt = oscuro ? '#29282d' : '#ffffff';
   const textoTt = oscuro ? '#f2f0ec' : '#1a1a18';
-  [chartProy, chartHist, chartRes, chartCats].forEach(ch => {
+  [chartRes, chartCats].forEach(ch => {
     if (!ch) return;
     ['x', 'y'].forEach(ax => {
       const s = ch.options.scales && ch.options.scales[ax];   // la dona no tiene ejes
