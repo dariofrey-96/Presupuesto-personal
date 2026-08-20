@@ -199,6 +199,13 @@ header .sub { font-size: .68rem; color: var(--text-3); display: none; }
   font-family: 'Inter', sans-serif; cursor: pointer;
 }
 .sync-btn:hover { border-color: var(--text-2); }
+.sync-nota { font-size: .68rem; color: var(--text-3); line-height: 1.4; margin-top: 10px; }
+.sync-input {
+  width: 100%; margin-top: 8px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  border-radius: 10px; padding: 9px 12px; font-size: .75rem; font-family: 'Inter', sans-serif;
+}
+.sync-input:focus { border-color: var(--accent); outline: none; }
 
 /* ══════════════════════════ LAYOUT SHELL ══════════════════════════ */
 .shell { display: block; min-height: calc(100vh - 57px); }
@@ -1299,6 +1306,7 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
     <div class="param-group">
       <div class="grp-label">Copia en GitHub</div>
       <div class="sync-linea"><span class="sync-dot" id="sync-dot-2"></span><span id="sync-detalle">Sin configurar todavía.</span></div>
+      <div id="gh-token-zona"></div>
       <button class="sync-btn" onclick="sincronizarAhora()">↻ Sincronizar ahora</button>
       <button class="sync-btn" id="btn-recuperar" style="display:none" onclick="recuperarDatosPrevios()">⟲ Recuperar lo que había antes</button>
     </div>
@@ -3350,7 +3358,7 @@ function programarSync() {
 
 async function subirPresupuesto(manual) {
   const token = ghToken();
-  if (!token) { setSyncEstado('', 'Sin token de GitHub: los datos quedan sólo en este dispositivo.'); return false; }
+  if (!token) { setSyncEstado('', 'Falta la llave: los datos quedan sólo en este dispositivo.'); return false; }
   // Nunca pisar el archivo bueno de GitHub con un dispositivo vacío. Vale
   // también para el botón manual: un clic sin querer no puede borrar meses de
   // carga hechos en otro lado.
@@ -3509,6 +3517,48 @@ async function traerCambiosDeOtroDispositivo() {
   return true;
 }
 
+// ── la llave, acá mismo ───────────────────────────────────────────────────
+// El token se guarda en una clave compartida con el Plan de Retiro (las dos
+// apps viven en el mismo dominio), pero el usuario NO tiene por qué saberlo ni
+// tiene que abrir la otra app para configurar ésta. Se pega acá.
+function pintarZonaToken() {
+  const z = $('gh-token-zona');
+  if (!z) return;
+  if (ghToken() && !z.dataset.editando) {
+    z.innerHTML = '<div class="sync-nota">🔑 La llave ya está puesta en este dispositivo.</div>' +
+                  '<button class="sync-btn" onclick="editarToken()">Cambiar la llave</button>';
+  } else {
+    z.innerHTML = '<div class="sync-nota">Pegá acá tu llave de GitHub para que lo que cargues se guarde y aparezca en tus otros dispositivos. Se guarda sólo en este navegador.</div>' +
+                  '<input type="password" id="gh-token-input" class="sync-input" placeholder="Pegá la llave acá" autocomplete="off" spellcheck="false">' +
+                  '<button class="sync-btn" onclick="guardarToken()">Guardar llave</button>';
+  }
+}
+function editarToken() {
+  const z = $('gh-token-zona');
+  z.dataset.editando = '1';
+  pintarZonaToken();
+  const i = $('gh-token-input');
+  if (i) i.focus();
+}
+async function guardarToken() {
+  const el = $('gh-token-input'), z = $('gh-token-zona');
+  if (!el) return;
+  const t = el.value.trim();
+  el.value = '';
+  delete z.dataset.editando;
+  if (!t) {
+    try { localStorage.removeItem(LS_GH_TOKEN); } catch (e) {}
+    pintarZonaToken();
+    setSyncEstado('', 'Sin llave: los datos quedan sólo en este dispositivo.');
+    return;
+  }
+  try { localStorage.setItem(LS_GH_TOKEN, t); }
+  catch (e) { alert('No pude guardar la llave en este navegador.'); return; }
+  pintarZonaToken();
+  setSyncEstado('loading', 'Llave guardada, probando…');
+  await arrancarSync();
+}
+
 // ── volver atrás si se trajo lo que no era ────────────────────────────────
 // Cada vez que se adopta una versión remota queda guardado lo que había antes.
 // Este botón lo devuelve, y guarda lo actual en su lugar: se puede ir y volver.
@@ -3581,7 +3631,8 @@ async function recuperarDatosPrevios() {
 // no, sube lo de acá.
 async function sincronizarAhora() {
   if (!ghToken()) {
-    alert('Este navegador no tiene guardado el token de GitHub.\n\nPegalo una vez en la app de Plan de Retiro (Ajustes) y las dos apps quedan sincronizadas: comparten el mismo token.');
+    alert('Falta la llave de GitHub en este dispositivo.\n\nPegala acá abajo, en "Copia en GitHub", y tus datos empiezan a guardarse solos.');
+    editarToken();
     return;
   }
   const restaurado = await restaurarPresupuestoSiEstaVacio();
@@ -3610,8 +3661,9 @@ document.addEventListener('visibilitychange', () => {
 // cambios locales que nunca llegaron a subirse, se suben.
 async function arrancarSync() {
   mostrarBotonRecuperar();
+  pintarZonaToken();
   if (!ghToken()) {
-    setSyncEstado('', 'Sin token de GitHub: los datos quedan sólo en este dispositivo.');
+    setSyncEstado('', 'Falta la llave: los datos quedan sólo en este dispositivo.');
     return;
   }
   const restaurado = await restaurarPresupuestoSiEstaVacio();
