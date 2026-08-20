@@ -3526,6 +3526,7 @@ function pintarZonaToken() {
   if (!z) return;
   if (ghToken() && !z.dataset.editando) {
     z.innerHTML = '<div class="sync-nota">🔑 La llave ya está puesta en este dispositivo.</div>' +
+                  '<button class="sync-btn" onclick="verLlave()">👁 Ver la llave (para copiarla a otro dispositivo)</button>' +
                   '<button class="sync-btn" onclick="editarToken()">Cambiar la llave</button>';
   } else {
     z.innerHTML = '<div class="sync-nota">Pegá acá tu llave de GitHub para que lo que cargues se guarde y aparezca en tus otros dispositivos. Se guarda sólo en este navegador.</div>' +
@@ -3533,6 +3534,28 @@ function pintarZonaToken() {
                   '<button class="sync-btn" onclick="guardarToken()">Guardar llave</button>';
   }
 }
+// La llave se guarda oculta en los dos lados, así que sin esto no había forma
+// de pasarla de un dispositivo a otro: había que crear una nueva en GitHub.
+// Se muestra sólo si el usuario la pide a propósito.
+function verLlave() {
+  const z = $('gh-token-zona');
+  z.innerHTML = '<div class="sync-nota">Esta es tu llave. Copiala y pegala en el otro dispositivo. Es como una contraseña: no se la pases a nadie.</div>' +
+                '<input class="sync-input" id="gh-token-ver" readonly>' +
+                '<button class="sync-btn" onclick="copiarLlave()">📋 Copiar la llave</button>' +
+                '<button class="sync-btn" onclick="pintarZonaToken()">Ocultar</button>';
+  const i = $('gh-token-ver');
+  i.value = ghToken() || '';
+  i.focus(); i.select();
+}
+async function copiarLlave() {
+  const i = $('gh-token-ver');
+  if (!i) return;
+  i.select(); i.setSelectionRange(0, 99999);
+  try { await navigator.clipboard.writeText(i.value); alert('Llave copiada ✓'); return; } catch (e) {}
+  try { document.execCommand('copy'); alert('Llave copiada ✓'); }
+  catch (e) { alert('No pude copiarla sola. Marcá el texto con el dedo (o el mouse) y copialo a mano.'); }
+}
+
 function editarToken() {
   const z = $('gh-token-zona');
   z.dataset.editando = '1';
