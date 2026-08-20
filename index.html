@@ -1300,6 +1300,7 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
       <div class="grp-label">Copia en GitHub</div>
       <div class="sync-linea"><span class="sync-dot" id="sync-dot-2"></span><span id="sync-detalle">Sin configurar todavía.</span></div>
       <button class="sync-btn" onclick="sincronizarAhora()">↻ Sincronizar ahora</button>
+      <button class="sync-btn" id="btn-recuperar" style="display:none" onclick="recuperarDatosPrevios()">⟲ Recuperar lo que había antes</button>
     </div>
 
   </aside>
@@ -3290,7 +3291,15 @@ function huellaDe(str) {
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
   return (h >>> 0) + '.' + str.length;
 }
-function huellaActual() { return huellaDe(JSON.stringify(datosPresupuesto())); }
+// Siempre en el orden de BACKUP_KEYS: dos copias con los mismos datos pero las
+// claves en distinto orden tienen que dar la misma huella, si no la app cree
+// que cambió algo cuando no cambió nada.
+function huellaDeDatos(data) {
+  const ordenado = {};
+  BACKUP_KEYS.forEach(k => { if (data[k] != null) ordenado[k] = data[k]; });
+  return huellaDe(JSON.stringify(ordenado));
+}
+function huellaActual() { return huellaDeDatos(datosPresupuesto()); }
 function huellaGuardada() { try { return localStorage.getItem(LS_SYNC_HUELLA); } catch (e) { return null; } }
 function guardarHuella(h) { try { localStorage.setItem(LS_SYNC_HUELLA, h); } catch (e) {} }
 
@@ -3342,9 +3351,15 @@ function programarSync() {
 async function subirPresupuesto(manual) {
   const token = ghToken();
   if (!token) { setSyncEstado('', 'Sin token de GitHub: los datos quedan sólo en este dispositivo.'); return false; }
-  if (!manual && !hayDatosLocales()) return false;   // nunca pisar el archivo bueno con nada
+  // Nunca pisar el archivo bueno de GitHub con un dispositivo vacío. Vale
+  // también para el botón manual: un clic sin querer no puede borrar meses de
+  // carga hechos en otro lado.
+  if (!hayDatosLocales()) {
+    if (manual) setSyncEstado('', 'No hay datos en este dispositivo para guardar.');
+    return false;
+  }
   const datos = datosPresupuesto();
-  const huella = huellaDe(JSON.stringify(datos));
+  const huella = huellaDeDatos(datos);
   if (!manual && huella === huellaGuardada()) return false;   // no cambió nada de verdad
   if (subiendo) {                                   // ya hay una subida en curso: se reintenta después
     clearTimeout(syncTimer);
@@ -3451,6 +3466,31 @@ async function traerCambiosDeOtroDispositivo() {
   if (!remota || !remota.data || !remota.updatedAt) return false;
   if (remota.updatedAt === marcaSync()) return false;          // ya estamos al día
 
+  // Los datos son idénticos: no hay nada que traer, sólo anotar que quedamos
+  // iguales. Sin esto se repintaría la pantalla al pedo cada vez.
+  if (huellaDeDatos(remota.data) === huellaActual()) {
+    marcarSincronizado(remota.updatedAt);
+    guardarHuella(huellaActual());
+    setSyncEstado('ok', 'Al día con GitHub.');
+    return false;
+  }
+
+  // PRIMER ENCUENTRO: este dispositivo tiene datos propios pero nunca vio el
+  // archivo de GitHub, así que no hay ninguna marca para comparar y no hay
+  // forma de saber cuál de los dos lados es el bueno. Adivinar mal borra meses
+  // de carga, así que se pregunta. Pasa una sola vez por dispositivo.
+  if (!marcaSync() && hayDatosLocales()) {
+    const traer = confirm(
+      'Es la primera vez que este dispositivo se conecta con la copia de GitHub.\n\n' +
+      'ACÁ tenés: ' + fraseDatos(datosPresupuesto()) + '\n' +
+      'EN GITHUB hay: ' + fraseDatos(remota.data) + '\n' +
+      '(guardado el ' + fechaLegible(remota.updatedAt) + ')\n\n' +
+      'ACEPTAR → traer lo de GitHub y reemplazar lo de este dispositivo.\n' +
+      'CANCELAR → dejar lo de este dispositivo y subirlo a GitHub.'
+    );
+    if (!traer) { await subirPresupuesto(true); return false; }
+  }
+
   // Antes de pisar nada se guarda lo que había: si algo se editó sin conexión y
   // no llegó a subirse, queda recuperable en vez de perdido.
   try {
@@ -3464,8 +3504,61 @@ async function traerCambiosDeOtroDispositivo() {
   marcarSincronizado(remota.updatedAt);
   guardarHuella(huellaActual());
   recargarPantallas();
+  mostrarBotonRecuperar();
   setSyncEstado('ok', 'Actualizado con los cambios de otro dispositivo.');
   return true;
+}
+
+// ── volver atrás si se trajo lo que no era ────────────────────────────────
+// Cada vez que se adopta una versión remota queda guardado lo que había antes.
+// Este botón lo devuelve, y guarda lo actual en su lugar: se puede ir y volver.
+function fraseDatos(data) {
+  let gastos = 0, meses = 0, ingreso = 0;
+  try {
+    const g = JSON.parse(data['presupuesto_gastos_v1'] || '{}');
+    const claves = Object.keys(g);
+    meses = claves.length;
+    claves.forEach(k => { gastos += (g[k] || []).length; });
+  } catch (e) {}
+  try {
+    const p = JSON.parse(data['presupuesto_params_v1'] || '{}');
+    ingreso = parseFloat((p.sliders || {}).salario) || 0;
+  } catch (e) {}
+  const partes = [];
+  partes.push(gastos ? gastos + (gastos === 1 ? ' gasto' : ' gastos') + ' en ' + meses + (meses === 1 ? ' mes' : ' meses') : 'ningún gasto cargado');
+  if (ingreso) partes.push('ingreso de ' + fmtARS(ingreso));
+  return partes.join(', ');
+}
+function fechaLegible(iso) {
+  try { return new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }); }
+  catch (e) { return iso; }
+}
+function copiaPrevia() {
+  try { const r = JSON.parse(localStorage.getItem(LS_PREVIO) || 'null'); return (r && r.data) ? r : null; }
+  catch (e) { return null; }
+}
+function mostrarBotonRecuperar() {
+  const b = $('btn-recuperar');
+  if (!b) return;
+  const c = copiaPrevia();
+  if (!c) { b.style.display = 'none'; return; }
+  b.style.display = '';
+  b.textContent = '⟲ Recuperar lo que había antes (' + fraseDatos(c.data) + ')';
+}
+async function recuperarDatosPrevios() {
+  const c = copiaPrevia();
+  if (!c) { alert('No hay ninguna copia anterior guardada en este dispositivo.'); return; }
+  if (!confirm(
+    'Esto vuelve a los datos que había en este dispositivo antes de la última sincronización:\n\n' +
+    fraseDatos(c.data) + '\n(guardados el ' + fechaLegible(c.guardadoEl) + ')\n\n' +
+    'Se suben a GitHub reemplazando lo que hay ahí. Lo que tenés ahora queda guardado, así que podés volver.\n\n¿Seguimos?'
+  )) return;
+  const actual = datosPresupuesto();
+  escribirDatos(c.data);
+  try { localStorage.setItem(LS_PREVIO, JSON.stringify({ guardadoEl: new Date().toISOString(), data: actual })); } catch (e) {}
+  recargarPantallas();
+  mostrarBotonRecuperar();
+  await subirPresupuesto(true);
 }
 
 // ── enganches ─────────────────────────────────────────────────────────────
@@ -3491,6 +3584,8 @@ async function sincronizarAhora() {
     alert('Este navegador no tiene guardado el token de GitHub.\n\nPegalo una vez en la app de Plan de Retiro (Ajustes) y las dos apps quedan sincronizadas: comparten el mismo token.');
     return;
   }
+  const restaurado = await restaurarPresupuestoSiEstaVacio();
+  if (restaurado) return;
   const adoptado = await traerCambiosDeOtroDispositivo();
   if (!adoptado) await subirPresupuesto(true);
 }
@@ -3514,6 +3609,7 @@ document.addEventListener('visibilitychange', () => {
 // cambiado en otro lado: una sola de las dos hace algo. Al final, si quedaron
 // cambios locales que nunca llegaron a subirse, se suben.
 async function arrancarSync() {
+  mostrarBotonRecuperar();
   if (!ghToken()) {
     setSyncEstado('', 'Sin token de GitHub: los datos quedan sólo en este dispositivo.');
     return;
