@@ -181,6 +181,25 @@ header .sub { font-size: .68rem; color: var(--text-3); display: none; }
 .icon-btn:hover { color: var(--text); border-color: var(--text-2); }
 .icon-btn .lbl { display: none; }
 
+/* Estado de la sincronización con GitHub. En el celular queda sólo el puntito
+   (la etiqueta se muestra recién en escritorio, igual que los demás botones). */
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3); flex: 0 0 auto;
+}
+.sync-dot.ok { background: var(--green); }
+.sync-dot.error { background: var(--red); }
+.sync-dot.loading { background: var(--accent); animation: syncPulse 1s ease-in-out infinite; }
+@keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+.sync-linea { display: flex; align-items: center; gap: 8px; font-size: .72rem; color: var(--text-2); line-height: 1.35; }
+.sync-btn {
+  margin-top: 10px; width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 100px; padding: 8px 14px; font-size: .72rem; font-weight: 500;
+  font-family: 'Inter', sans-serif; cursor: pointer;
+}
+.sync-btn:hover { border-color: var(--text-2); }
+
 /* ══════════════════════════ LAYOUT SHELL ══════════════════════════ */
 .shell { display: block; min-height: calc(100vh - 57px); }
 
@@ -958,6 +977,7 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
   <div class="header-right">
     <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">⚙ Parámetros</button>
     <button class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Cambiar modo claro/oscuro"><span id="theme-icon">🌙</span> <span class="lbl" id="theme-lbl">Oscuro</span></button>
+    <button class="icon-btn" id="sync-chip" onclick="sincronizarAhora()" title="Estado de la sincronización con GitHub"><span class="sync-dot" id="sync-dot"></span> <span class="lbl" id="sync-msg">Local</span></button>
     <button class="icon-btn" onclick="exportBackup()" title="Descargar todos los datos en un archivo JSON">⬇ <span class="lbl">Backup</span></button>
     <button class="icon-btn" onclick="$('import-file-input').click()" title="Restaurar datos desde un backup JSON">⬆ <span class="lbl">Restaurar</span></button>
     <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="importBackup(event)">
@@ -1274,6 +1294,12 @@ html[data-theme="dark"] .imp-backdrop { background: rgba(0,0,0,.6); }
           <span class="val" id="v-umbralAlerta"></span>
         </div>
       </div>
+    </div>
+
+    <div class="param-group">
+      <div class="grp-label">Copia en GitHub</div>
+      <div class="sync-linea"><span class="sync-dot" id="sync-dot-2"></span><span id="sync-detalle">Sin configurar todavía.</span></div>
+      <button class="sync-btn" onclick="sincronizarAhora()">↻ Sincronizar ahora</button>
     </div>
 
   </aside>
@@ -3209,6 +3235,299 @@ if (distBarEl) {
   });
 }
 
+</script>
+
+<script>
+// ── SINCRONIZACIÓN CON GITHUB ─────────────────────────────────────────────
+// Los datos de esta app viajan al MISMO repositorio privado donde el Plan de
+// Retiro guarda la cartera (`Plan-retiro-datos`), pero en un archivo aparte:
+// presupuesto.json. Las dos apps se publican bajo dariofrey-96.github.io, así
+// que para el navegador son el mismo sitio y comparten localStorage — por eso
+// se reusa el token que ya está pegado ahí y no hay nada nuevo que configurar.
+//
+// Es "gana el último que sube", a propósito: si se edita en dos dispositivos a
+// la vez, queda la versión del que guardó al final. Resolver conflictos de
+// verdad no vale la pena para un presupuesto personal.
+const GH_OWNER = 'dariofrey-96';
+const GH_REPO  = 'Plan-retiro-datos';
+const GH_RAMA  = 'main';
+const GH_PATH_PRESUPUESTO = 'presupuesto.json';
+const LS_GH_TOKEN    = 'planRetiro_gh_token';       // clave compartida con el Plan de Retiro
+const LS_SYNC_MARCA  = 'presupuesto_sync_v1';       // con qué versión de GitHub quedamos iguales
+const LS_SYNC_HUELLA = 'presupuesto_sync_huella_v1';// qué datos llegaron a subirse de verdad
+const LS_PREVIO      = 'presupuesto_previo_v1';     // copia de lo que había antes de adoptar lo remoto
+const SYNC_RETARDO = 2000;   // ms: junta varios cambios seguidos en un solo commit
+
+function ghToken() { try { return localStorage.getItem(LS_GH_TOKEN); } catch (e) { return null; } }
+function marcaSync() { try { return localStorage.getItem(LS_SYNC_MARCA); } catch (e) { return null; } }
+// La marca es lo que después permite distinguir "otro dispositivo cambió algo"
+// de "esto lo cambié yo". Se anota tanto al subir como al adoptar.
+function marcarSincronizado(updatedAt) {
+  try { if (updatedAt) localStorage.setItem(LS_SYNC_MARCA, updatedAt); } catch (e) {}
+}
+
+// ── qué se guarda ─────────────────────────────────────────────────────────
+// Exactamente lo mismo que arma el backup manual (BACKUP_KEYS), para que un
+// archivo sirva para las dos cosas y no haya dos formatos distintos.
+function datosPresupuesto() {
+  const data = {};
+  BACKUP_KEYS.forEach(k => { try { const v = localStorage.getItem(k); if (v != null) data[k] = v; } catch (e) {} });
+  return data;
+}
+function hayDatosLocales() {
+  return BACKUP_KEYS.some(k => {
+    let v = null; try { v = localStorage.getItem(k); } catch (e) {}
+    if (v == null) return false;
+    const s = v.trim();
+    return s !== '' && s !== '{}' && s !== '[]' && s !== 'null';
+  });
+}
+// Huella corta de los datos: sirve para no generar un commit cuando en realidad
+// no cambió nada, y para darse cuenta al abrir de que quedaron cambios sin
+// subir (por ejemplo, editados sin conexión).
+function huellaDe(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0) + '.' + str.length;
+}
+function huellaActual() { return huellaDe(JSON.stringify(datosPresupuesto())); }
+function huellaGuardada() { try { return localStorage.getItem(LS_SYNC_HUELLA); } catch (e) { return null; } }
+function guardarHuella(h) { try { localStorage.setItem(LS_SYNC_HUELLA, h); } catch (e) {} }
+
+// ── cartel de estado ──────────────────────────────────────────────────────
+const SYNC_ETIQUETAS = { ok: 'Guardado', loading: 'Guardando…', error: 'Sin guardar', '': 'Local' };
+function setSyncEstado(estado, detalle) {
+  [$('sync-dot'), $('sync-dot-2')].forEach(d => { if (d) d.className = 'sync-dot ' + estado; });
+  const lbl = $('sync-msg'); if (lbl) lbl.textContent = SYNC_ETIQUETAS[estado] || 'Local';
+  const det = $('sync-detalle'); if (det) det.textContent = detalle;
+  const chip = $('sync-chip'); if (chip) chip.title = detalle;
+}
+function horaCorta() { return new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }); }
+
+// ── leer de GitHub ────────────────────────────────────────────────────────
+// Pide el contenido "crudo": el JSON de la API devuelve el archivo empaquetado
+// y deja de servirlo arriba de 1 MB.
+async function ghLeerJson(path) {
+  const token = ghToken();
+  if (!token) return null;                 // el repo es privado: sin token no hay nada que leer
+  const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}?ref=${GH_RAMA}`;
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw' }
+  });
+  if (res.status === 404) return null;     // todavía no existe: no es un error
+  if (!res.ok) throw new Error('GitHub respondió ' + res.status);
+  return res.json();
+}
+
+// ── subir a GitHub ────────────────────────────────────────────────────────
+function b64Utf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin);
+}
+
+let syncTimer = null, subiendo = false;
+
+// Se llama en cada cambio de datos, pero no sube al toque: espera un momento
+// para no generar un commit por tecla.
+function programarSync() {
+  if (!ghToken()) return;
+  clearTimeout(syncTimer);
+  setSyncEstado('loading', 'Cambios sin guardar todavía…');
+  syncTimer = setTimeout(() => subirPresupuesto(), SYNC_RETARDO);
+}
+
+async function subirPresupuesto(manual) {
+  const token = ghToken();
+  if (!token) { setSyncEstado('', 'Sin token de GitHub: los datos quedan sólo en este dispositivo.'); return false; }
+  if (!manual && !hayDatosLocales()) return false;   // nunca pisar el archivo bueno con nada
+  const datos = datosPresupuesto();
+  const huella = huellaDe(JSON.stringify(datos));
+  if (!manual && huella === huellaGuardada()) return false;   // no cambió nada de verdad
+  if (subiendo) {                                   // ya hay una subida en curso: se reintenta después
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => subirPresupuesto(manual), SYNC_RETARDO);
+    return false;
+  }
+
+  subiendo = true;
+  setSyncEstado('loading', 'Guardando en GitHub…');
+  const api = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${GH_PATH_PRESUPUESTO}`;
+  try {
+    let sha = null;
+    const getRes = await fetch(api + `?ref=${GH_RAMA}`, {
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
+    });
+    if (getRes.ok) { const cur = await getRes.json(); sha = cur.sha; }
+    else if (getRes.status !== 404) {               // 404 = todavía no existe, se crea abajo
+      setSyncEstado('error', 'No pude leer el archivo en GitHub (revisá el token).');
+      return false;
+    }
+
+    const payload = { app: 'presupuesto_personal', updatedAt: new Date().toISOString(), data: datos };
+    const body = {
+      message: 'Actualizar presupuesto desde la app',
+      content: b64Utf8(JSON.stringify(payload, null, 2)),
+      branch: GH_RAMA
+    };
+    if (sha) body.sha = sha;
+
+    const putRes = await fetch(api, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (putRes.ok) {
+      marcarSincronizado(payload.updatedAt);
+      guardarHuella(huella);
+      setSyncEstado('ok', 'Guardado en GitHub · ' + horaCorta());
+      return true;
+    }
+    if (putRes.status === 409) {                    // otro dispositivo escribió en el medio
+      setSyncEstado('loading', 'Otro dispositivo guardó recién, reintentando…');
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => subirPresupuesto(manual), SYNC_RETARDO);
+      return false;
+    }
+    const err = await putRes.json().catch(() => ({}));
+    setSyncEstado('error', 'No se pudo guardar' + (err.message ? ': ' + err.message : '.'));
+    return false;
+  } catch (e) {
+    setSyncEstado('error', 'Sin conexión: los cambios quedaron sólo en este dispositivo.');
+    return false;
+  } finally { subiendo = false; }
+}
+
+// ── traer lo de GitHub a la app ───────────────────────────────────────────
+function escribirDatos(data) {
+  // Se borra lo que la versión remota no trae: si allá se borró algo, acá
+  // también tiene que desaparecer.
+  BACKUP_KEYS.forEach(k => {
+    try { if (data[k] != null) localStorage.setItem(k, data[k]); else localStorage.removeItem(k); } catch (e) {}
+  });
+}
+// Vuelve a leer todo de la memoria del navegador y repinta. Los datos cambiaron
+// abajo de la app, así que hay que refrescar sliders, tipo de cambio y pantallas.
+function recargarPantallas() {
+  try {
+    loadParams();
+    Object.keys(sliders).forEach(id => {
+      const el = $(id), vEl = $('v-' + id);
+      if (el && vEl) vEl.textContent = sliders[id](parseFloat(el.value));
+    });
+    let tcGuardado = '';
+    try { tcGuardado = localStorage.getItem(LS_TC) || ''; } catch (e) {}
+    $('tipoCambio').value = tcGuardado;
+    mesVisible = monthKey();
+    renderResumen();
+    renderGastos();
+  } catch (e) {}
+}
+
+// Sólo actúa si no hay absolutamente nada guardado en este navegador; si no,
+// pisaría datos buenos. Es un camino de ida, de GitHub hacia la app.
+async function restaurarPresupuestoSiEstaVacio() {
+  if (hayDatosLocales()) return false;
+  let remota;
+  try { remota = await ghLeerJson(GH_PATH_PRESUPUESTO); }
+  catch (e) { setSyncEstado('error', 'No pude leer los datos guardados en GitHub.'); return false; }
+  if (!remota || !remota.data) return false;
+  escribirDatos(remota.data);
+  marcarSincronizado(remota.updatedAt);
+  guardarHuella(huellaActual());
+  recargarPantallas();
+  setSyncEstado('ok', 'Datos restaurados desde GitHub.');
+  return true;
+}
+
+// Si la versión de GitHub no es la misma con la que quedamos iguales la última
+// vez, es porque la tocó otro dispositivo y hay que adoptarla.
+async function traerCambiosDeOtroDispositivo() {
+  let remota;
+  try { remota = await ghLeerJson(GH_PATH_PRESUPUESTO); } catch (e) { return false; }
+  if (!remota || !remota.data || !remota.updatedAt) return false;
+  if (remota.updatedAt === marcaSync()) return false;          // ya estamos al día
+
+  // Antes de pisar nada se guarda lo que había: si algo se editó sin conexión y
+  // no llegó a subirse, queda recuperable en vez de perdido.
+  try {
+    localStorage.setItem(LS_PREVIO, JSON.stringify({ guardadoEl: new Date().toISOString(), data: datosPresupuesto() }));
+  } catch (e) {}
+
+  escribirDatos(remota.data);
+  // Se anota la versión adoptada y NO se vuelve a subir: subir generaría un
+  // updatedAt nuevo, el otro dispositivo lo bajaría y lo volvería a subir, y se
+  // estarían pisando en círculo para siempre.
+  marcarSincronizado(remota.updatedAt);
+  guardarHuella(huellaActual());
+  recargarPantallas();
+  setSyncEstado('ok', 'Actualizado con los cambios de otro dispositivo.');
+  return true;
+}
+
+// ── enganches ─────────────────────────────────────────────────────────────
+// Se sincroniza cuando cambian los datos de verdad. El estado de las alertas
+// (cuáles ya se mostraron) queda afuera a propósito: es ruido de pantalla, y
+// viaja igual pegado al próximo cambio real.
+(function () {
+  const _saveParams = saveParams, _saveGastosAll = saveGastosAll, _saveTC = saveTC,
+        _saveAlertasCfg = saveAlertasCfg, _saveRecurrentes = saveRecurrentes,
+        _saveReglasImport = saveReglasImport;
+  saveParams       = function (...a) { const r = _saveParams(...a);       programarSync(); return r; };
+  saveGastosAll    = function (...a) { const r = _saveGastosAll(...a);    programarSync(); return r; };
+  saveTC           = function (...a) { const r = _saveTC(...a);           programarSync(); return r; };
+  saveAlertasCfg   = function (...a) { const r = _saveAlertasCfg(...a);   programarSync(); return r; };
+  saveRecurrentes  = function (...a) { const r = _saveRecurrentes(...a);  programarSync(); return r; };
+  saveReglasImport = function (...a) { const r = _saveReglasImport(...a); programarSync(); return r; };
+})();
+
+// El botón manual: primero mira si otro dispositivo tiene algo más nuevo y, si
+// no, sube lo de acá.
+async function sincronizarAhora() {
+  if (!ghToken()) {
+    alert('Este navegador no tiene guardado el token de GitHub.\n\nPegalo una vez en la app de Plan de Retiro (Ajustes) y las dos apps quedan sincronizadas: comparten el mismo token.');
+    return;
+  }
+  const adoptado = await traerCambiosDeOtroDispositivo();
+  if (!adoptado) await subirPresupuesto(true);
+}
+
+let ultimaMirada = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    // Si quedó un cambio esperando el retardo, se sube antes de irse.
+    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; subirPresupuesto(); }
+    return;
+  }
+  // Al volver a la app se mira si otro dispositivo cambió algo, pero no más de
+  // una vez por minuto.
+  if (Date.now() - ultimaMirada < 60000) return;
+  ultimaMirada = Date.now();
+  traerCambiosDeOtroDispositivo();
+});
+
+// ── arranque ──────────────────────────────────────────────────────────────
+// Primero se intenta restaurar (dispositivo vacío) y si no, traer lo que haya
+// cambiado en otro lado: una sola de las dos hace algo. Al final, si quedaron
+// cambios locales que nunca llegaron a subirse, se suben.
+async function arrancarSync() {
+  if (!ghToken()) {
+    setSyncEstado('', 'Sin token de GitHub: los datos quedan sólo en este dispositivo.');
+    return;
+  }
+  const restaurado = await restaurarPresupuestoSiEstaVacio();
+  const adoptado = restaurado ? false : await traerCambiosDeOtroDispositivo();
+  if (restaurado || adoptado) return;
+  if (!hayDatosLocales()) { setSyncEstado('', 'Todavía no hay nada que guardar.'); return; }
+  // Quedaron cambios que nunca llegaron a subirse (por ejemplo, editados sin
+  // conexión): se suben ahora.
+  if (huellaActual() !== huellaGuardada()) { await subirPresupuesto(); return; }
+  setSyncEstado('ok', 'Al día con GitHub.');
+}
+arrancarSync();
 </script>
 </body>
 </html>

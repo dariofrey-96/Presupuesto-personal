@@ -21,7 +21,7 @@ Dos apps hermanas (HTML/JS, hosteadas en GitHub Pages), mismo sistema de diseño
 El usuario **quiere monetizar esto**: que otras personas se lo descarguen y pagar por ello. Consultó con otra IA sobre qué debería tener una app así y trajo una lista (conciliación bancaria, Open Finance, MFA/FIDO2, Zero Trust, AES-256, HSM, DORA). Postura acordada:
 
 - **La lista de seguridad describe cómo proteger un servidor, y esta app no tiene servidor.** Hoy es más privada que cualquier fintech porque no hay nada que hackear. Seguir esa lista implicaría construir el backend primero — o sea, crear el riesgo y después defenderlo. Todo eso pasa a ser obligatorio **solo si** se convierte en producto multiusuario (ahí además aplica la ley argentina de datos personales 25.326).
-- **Los riesgos reales de hoy son otros**: si limpia el navegador sin exportar el backup pierde todo, y cualquiera con acceso a su compu ve los datos.
+- **Los riesgos reales de hoy son otros**: ~~si limpia el navegador sin exportar el backup pierde todo~~ (resuelto el 2026-08-20 con la copia automática en GitHub), y cualquiera con acceso a su compu ve los datos.
 - **Open Finance / conexión al banco no es viable en Argentina** para un proyecto personal. El lector de PDF no es un plan B: es *la* solución local.
 - **Diferencial real frente a Fintonic/YNAB/Mobills**: entender cuotas argentinas ("8 de 10" reubicada al mes del resumen), pagos por trimestre, inflación y dualidad peso/dólar.
 - **Consejo dado**: la app ya está publicada y es gratis de mantener. Validar con 10-20 personas reales antes de invertir en backend; el orden inverso es el error caro más común. Aclarado que esto no es asesoramiento de negocios y que no se puede predecir el éxito comercial.
@@ -75,7 +75,7 @@ El usuario dijo que la app tenía "demasiado relleno" y que se perdía. Se decid
 
 ### Dónde se guardan los datos
 
-Todo en `localStorage` del navegador — **no hay servidor ni sincronización automática** (a diferencia del repo de Plan de Retiro, que sí sincroniza a GitHub):
+Todo en `localStorage` del navegador, **más una copia en GitHub** desde el 2026-08-20 (ver "Sincronización con GitHub" abajo):
 
 - `presupuesto_params_v1` — sliders y toggles del presupuesto.
 - `presupuesto_gastos_v1` — gastos cargados, agrupados por mes (`{"2026-08": [...]}`).
@@ -84,7 +84,11 @@ Todo en `localStorage` del navegador — **no hay servidor ni sincronización au
 - `presupuesto_theme` — tema claro/oscuro.
 - `presupuesto_alertas_cfg_v1` — config de alertas de categoría (`{activas, umbral}`).
 - `presupuesto_alertas_estado_v1` — qué alertas ya se mostraron y cuáles se silenciaron, por mes y categoría (`{"2026-08": {"juntadas": {nivel, mute}}}`).
+- `presupuesto_sync_v1` — `updatedAt` de la versión de GitHub con la que este dispositivo quedó igual.
+- `presupuesto_sync_huella_v1` — huella de los datos que llegaron a subirse de verdad.
+- `presupuesto_previo_v1` — copia de lo que había antes de adoptar una versión remota.
 - `planRetiro_params_v1` — **clave compartida con la app de Plan de Retiro.**
+- `planRetiro_gh_token` — **clave compartida**: el token de GitHub que ya usa el Plan de Retiro.
 
 ### Integración con Plan de Retiro (importante)
 
@@ -96,7 +100,35 @@ Hay 22 categorías fijas en el array `GASTO_CATS` (id + label). Los ids coincide
 
 ### Backup
 
-Export/import manual a archivo JSON (`exportBackup()` / `importBackup()`), que abarca las claves de params, gastos, snapshots, tipo de cambio y alertas (`BACKUP_KEYS`). Es el único mecanismo de respaldo — si el usuario limpia el navegador sin exportar, pierde los datos.
+Export/import manual a archivo JSON (`exportBackup()` / `importBackup()`), que abarca las claves de params, gastos, snapshots, tipo de cambio y alertas (`BACKUP_KEYS`). **Se deja tal cual a pedido del usuario**: sirve para sacar los datos afuera de GitHub. Desde el 2026-08-20 ya no es el único respaldo.
+
+### Sincronización con GitHub (implementado 2026-08-20)
+
+Último bloque `<script>` del archivo. Resuelve el riesgo real que estaba anotado en el objetivo comercial: si limpiaba el navegador sin exportar, perdía todo.
+
+- **Dónde**: `presupuesto.json` en `dariofrey-96/Plan-retiro-datos`, el **mismo repo privado** donde el Plan de Retiro guarda la cartera, en archivo aparte (no se tocan entre sí).
+- **Token**: se reusa `planRetiro_gh_token`. Las dos apps se publican bajo `dariofrey-96.github.io`, así que para el navegador son el mismo sitio y comparten `localStorage`. **No hay nada nuevo que configurar** ni token/repo propios que crear.
+- **Formato**: `{app, updatedAt, data}` donde `data` es exactamente lo que arma `exportBackup()` a partir de `BACKUP_KEYS`. Un solo formato para las dos cosas.
+- **Cuándo sube**: `programarSync()` se engancha a `saveParams`, `saveGastosAll`, `saveTC`, `saveAlertasCfg`, `saveRecurrentes` y `saveReglasImport` reemplazando la referencia global (no se tocó ninguna función original). Retardo de 2s para no hacer un commit por tecla, y no sube si la huella de los datos no cambió. `saveAlertasEstado` queda **afuera a propósito**: es ruido de pantalla, viaja pegado al próximo cambio real.
+- **Al abrir** (`arrancarSync()`): primero `restaurarPresupuestoSiEstaVacio()`, si no `traerCambiosDeOtroDispositivo()`, y al final sube si quedaron cambios sin subir. Una sola de las tres hace algo.
+- **Cartel de estado**: puntito de color en el header (verde/rojo/gris, con la etiqueta visible sólo en escritorio) y línea completa + botón "↻ Sincronizar ahora" en el grupo "Copia en GitHub" del panel de Ajustes. El botón manual primero baja lo de otro dispositivo y, si no hay nada más nuevo, sube lo de acá.
+- **Es "gana el último que sube"**, decidido así a propósito. No se intenta resolver conflictos.
+
+**Trampas que ya nos habían mordido en el repo hermano y están cubiertas acá:**
+
+- **Al adoptar la versión remota NO se vuelve a subir.** Si se subiera, se generaría un `updatedAt` nuevo, el otro dispositivo lo bajaría y lo volvería a subir: se pisan en círculo para siempre.
+- **`presupuesto_sync_v1` se anota tanto al subir como al adoptar.** Sin esa marca no hay forma de distinguir "otro dispositivo cambió algo" de "esto lo cambié yo".
+- **Antes de pisar lo local se guarda `presupuesto_previo_v1`**, por si había algo editado sin conexión que no llegó a subirse.
+- **Un 404 al leer significa "todavía no existe", no es error** y no muestra cartel rojo.
+- **Se pide `Accept: application/vnd.github.raw`**: el JSON de la API deja de devolver el archivo arriba de 1 MB.
+- **La restauración actúa sólo si no hay absolutamente nada local** (`hayDatosLocales()` mira todas las `BACKUP_KEYS`), si no pisaría datos buenos.
+- **Nunca se sube un payload vacío.** Si el dispositivo está vacío y encima falla la lectura, subir "nada" borraría el archivo bueno de GitHub. Por eso `subirPresupuesto()` corta si no hay datos locales.
+- **`presupuesto_sync_huella_v1` cubre los cambios que nunca llegaron a subirse** (editados sin conexión, o un backup manual restaurado): al abrir, si la huella de los datos no coincide con la última subida, se sube. Sin eso, un cambio hecho offline quedaba sólo en ese dispositivo para siempre.
+- **Un 409** (otro dispositivo escribió entre el GET del sha y el PUT) reintenta solo a los 2s.
+
+**Probado con un GitHub falso en memoria** (se intercepta `fetch` a `api.github.com` y se responde con un archivo simulado, sha incluido). Casos verificados: dispositivo vacío que restaura; dispositivo con datos viejos que adopta lo nuevo y guarda la copia previa; **abrir dos veces seguidas no toca nada** (1 GET, ningún PUT, sha remoto intacto); cambio local que sube tras el retardo; guardar sin cambios reales que no genera commit; cambio offline que se sube al abrir de nuevo; 404 (crea el archivo, sin error); 409 (reintenta y termina bien); sin token (no hace ninguna petición, la app sigue andando y el cartel dice "los datos quedan sólo en este dispositivo"); y el backup manual, que sigue exportando el JSON igual que siempre.
+
+**Para volver a probarlo**: no hace falta el token real. Interceptar `fetch` como arriba y llamar a `arrancarSync()` a mano después de armar el estado.
 
 ### Alertas de categoría (implementado 2026-08-13)
 
